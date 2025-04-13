@@ -1,5 +1,15 @@
 # Changelog for `sourcify-database`
 
+## sourcify-database@2.4.0 - 2025-04-09
+
+- Add `updated_at` to `sourcify_matches`
+
+## sourcify-database@2.3.0 - 2025-03-19
+
+- Add verification_jobs tables
+- Update the VerA schema
+- Update dependencies
+
 ## sourcify-database@2.2.1 - 2025-02-18
 
 - Make Dune namespace configurable

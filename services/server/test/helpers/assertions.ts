@@ -4,7 +4,6 @@ import config from "config";
 import path from "path";
 import fs from "fs";
 import { getAddress, id } from "ethers";
-import { getMatchStatus } from "../../src/server/common";
 import type { Response } from "superagent";
 import type { Done } from "mocha";
 import { Pool } from "pg";
@@ -13,6 +12,7 @@ import {
   TransformationValues,
 } from "@ethereum-sourcify/lib-sourcify";
 import { ServerFixture } from "./ServerFixture";
+import { getMatchStatus } from "../../src/server/apiv1/controllers.common";
 
 export const assertValidationError = (
   err: Error | null,
@@ -164,13 +164,13 @@ export async function assertTransformations(
     .to.deep.equal(expectedCreationTransformationValues);
 }
 
-async function assertContractSaved(
+export async function assertContractSaved(
   sourcifyDatabase: Pool | null,
   expectedAddress: string | undefined,
   expectedChain: string | undefined,
   expectedStatus: string,
-  testS3Path: string | null,
-  testS3Bucket: string | null,
+  testS3Path?: string | null,
+  testS3Bucket?: string | null,
 ) {
   if (expectedStatus === "perfect" || expectedStatus === "partial") {
     // Check if saved to fs repository
@@ -275,8 +275,6 @@ async function assertContractSaved(
           getMatchStatus({
             runtimeMatch: contract.runtime_match,
             creationMatch: contract.creation_match,
-            address: "0x" + contract.address.toString("hex"),
-            chainId: contract.chain_id,
           }),
         )
         .to.equal(expectedStatus);

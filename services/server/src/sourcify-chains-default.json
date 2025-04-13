@@ -125,14 +125,36 @@
       }
     }
   },
-  "7078815900": {
-    "sourcifyName": "Ethereum Mekong Testnet",
+  "560048": {
+    "sourcifyName": "Ethereum Hoodi Testnet",
     "supported": true,
+    "etherscanApi": {
+      "apiURL": "https://api-hoodi.etherscan.io",
+      "apiKeyEnvName": "ETHERSCAN_API_KEY"
+    },
     "fetchContractCreationTxUsing": {
       "blockscoutApi": {
-        "url": "https://explorer.mekong.ethpandaops.io/"
+        "url": "https://eth-hoodi.blockscout.com/"
+      },
+      "etherscanApi": true,
+      "routescanApi": {
+        "type": "testnet"
       }
-    }
+    },
+    "rpc": [
+      "https://rpc.hoodi.ethpandaops.io",
+      {
+        "type": "APIKeyRPC",
+        "url": "https://{SUBDOMAIN}.ethereum-hoodi.quiknode.pro/{API_KEY}",
+        "apiKeyEnvName": "QUICKNODE_API_KEY",
+        "subDomainEnvName": "QUICKNODE_SUBDOMAIN",
+        "traceSupport": "trace_transaction"
+      }
+    ]
+  },
+  "7078815900": {
+    "sourcifyName": "Ethereum Mekong Testnet",
+    "supported": false
   },
   "369": {
     "sourcifyName": "PulseChain Mainnet",
@@ -264,7 +286,7 @@
     "supported": true,
     "fetchContractCreationTxUsing": {
       "blockscoutApi": {
-        "url": "https://https://happy-testnet-sepolia.explorer.caldera.xyz"
+        "url": "https://explorer.testnet.happy.tech"
       }
     }
   },
@@ -528,7 +550,7 @@
     "supported": true,
     "fetchContractCreationTxUsing": {
       "blockscoutScrape": {
-        "url": "https://tanenbaum.io/"
+        "url": "https://explorer.tanenbaum.io/"
       }
     }
   },
@@ -830,10 +852,7 @@
   },
   "11111": {
     "sourcifyName": "WAGMI Testnet",
-    "supported": true,
-    "fetchContractCreationTxUsing": {
-      "avalancheApi": true
-    }
+    "supported": false
   },
   "192837465": {
     "sourcifyName": "Gather Mainnet",
@@ -1138,7 +1157,7 @@
   },
   "641230": {
     "sourcifyName": "Bear Network Chain Mainnet",
-    "supported": false,
+    "supported": true,
     "fetchContractCreationTxUsing": {
       "blockscoutScrape": {
         "url": "https://brnkscan.bearnetwork.net/"
@@ -1356,20 +1375,11 @@
   },
   "222000222": {
     "sourcifyName": "Kanazawa Testnet",
-    "supported": true,
-    "fetchContractCreationTxUsing": {
-      "avalancheApi": true
-    }
+    "supported": false
   },
   "333000333": {
     "sourcifyName": "MELD",
-    "supported": true,
-    "fetchContractCreationTxUsing": {
-      "avalancheApi": true,
-      "routescanApi": {
-        "type": "mainnet"
-      }
-    }
+    "supported": false
   },
   "2222": {
     "sourcifyName": "Kava EVM",
@@ -1738,10 +1748,7 @@
   },
   "1127469": {
     "sourcifyName": "Tiltyard Subnet",
-    "supported": true,
-    "fetchContractCreationTxUsing": {
-      "avalancheApi": true
-    }
+    "supported": false
   },
   "1101": {
     "sourcifyName": "Polygon zkEVM",
@@ -2035,19 +2042,11 @@
   },
   "17069": {
     "sourcifyName": "Garnet Holesky",
-    "supported": true,
-    "fetchContractCreationTxUsing": {
-      "blockscoutApi": {
-        "url": "https://explorer.garnetchain.com/api"
-      }
-    }
+    "supported": false
   },
   "12898": {
     "sourcifyName": "PlayFair Testnet Subnet",
-    "supported": true,
-    "fetchContractCreationTxUsing": {
-      "avalancheApi": true
-    }
+    "supported": false
   },
   "19011": {
     "sourcifyName": "HOME Verse Mainnet",
@@ -2248,10 +2247,13 @@
     "sourcifyName": "Zircuit Mainnet",
     "supported": true
   },
+  "48898": {
+    "sourcifyName": "Zircuit Garfield Testnet",
+    "supported": true
+  },
   "48899": {
     "sourcifyName": "Zircuit Testnet",
-    "supported": true,
-    "rpc": ["https://zircuit1-testnet.p2pify.com/"]
+    "supported": true
   },
   "7171": {
     "sourcifyName": "Bitrock Mainnet",
@@ -2311,5 +2313,4 @@
       }
     }
   }
-
 }

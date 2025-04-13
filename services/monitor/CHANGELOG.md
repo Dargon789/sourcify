@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## sourcify-monitor@1.3.9 - 2025-04-09
+
+- Update dependencies
+- Use the new `FetchRequestRPC`
+
+## sourcify-monitor@1.3.8 - 2025-03-19
+
+- Update dependencies
+
 ## sourcify-monitor@1.3.7 - 2025-02-18
 
 - Add Zircuit mainnet (48900) to monitored chains

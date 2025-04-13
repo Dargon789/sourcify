@@ -124,13 +124,13 @@ describe("Test Supported Chains", function () {
   //   "shared/"
   // );
 
-  // Ethereum Mekong Testnet
-  verifyContract(
-    "0x247a8A599c99336dF37af1975661b32f7A26a88E",
-    "7078815900",
-    "Ethereum Mekong Testnet",
-    "shared/",
-  );
+  // // Ethereum Mekong Testnet
+  // verifyContract(
+  //   "0x247a8A599c99336dF37af1975661b32f7A26a88E",
+  //   "7078815900",
+  //   "Ethereum Mekong Testnet",
+  //   "shared/",
+  // );
 
   verifyContract(
     "0x7ecedB5ca848e695ee8aB33cce9Ad1E1fe7865F8",
@@ -143,6 +143,13 @@ describe("Test Supported Chains", function () {
     "0x8F78b9c92a68DdF719849a40702cFBfa4EB60dD0",
     "11155111",
     "Sepolia",
+    "shared/",
+  );
+
+  verifyContract(
+    "0x247a8A599c99336dF37af1975661b32f7A26a88E",
+    "560048",
+    "Ethereum Hoodi Testnet",
     "shared/",
   );
 
@@ -252,11 +259,10 @@ describe("Test Supported Chains", function () {
   );
 
   verifyContract(
-    "0x0912105a5383b63DF25BBe39Bedc3De407c6c64B",
+    "0x54Add02fC1664435c38BA49e5553F5952F777bD9",
     "216",
     "Happychain Testnet",
     "shared/",
-    "partial",
   );
 
   verifyContract(
@@ -553,12 +559,12 @@ describe("Test Supported Chains", function () {
   );
 
   // WAGMI Testnet
-  verifyContract(
-    "0x5974BF3196fc03A20cEB196270307707e0158BbD",
-    "11111",
-    "WAGMI",
-    "shared/",
-  );
+  // verifyContract(
+  //   "0x5974BF3196fc03A20cEB196270307707e0158BbD",
+  //   "11111",
+  //   "WAGMI",
+  //   "shared/",
+  // );
 
   // // Gather Mainnet
   // verifyContract(
@@ -841,13 +847,13 @@ describe("Test Supported Chains", function () {
     "shared/",
   );
 
-  // // Bear Network Chain Mainnet
-  // verifyContract(
-  //   "0x0f103813fa15CA19b6C4B46a0Afe99440b81d7C3",
-  //   "641230",
-  //   "Bear Network Chain Mainnet",
-  //   "shared/",
-  // );
+  // Bear Network Chain Mainnet
+  verifyContract(
+    "0x115B83FE885D2Acf6099B6f3aAa75502CEBBA154",
+    "641230",
+    "Bear Network Chain Mainnet",
+    "shared/",
+  );
 
   // Lyra Mainnet
   verifyContract(
@@ -1029,20 +1035,20 @@ describe("Test Supported Chains", function () {
   );
 
   // Kanazawa Chain Testnet
-  verifyContract(
-    "0x24c456Fb4c450208366B1f8322c3241aA013758e",
-    "222000222",
-    "Kanazawa Chain",
-    "multicall-literal-contents/",
-  );
+  // verifyContract(
+  //   "0x24c456Fb4c450208366B1f8322c3241aA013758e",
+  //   "222000222",
+  //   "Kanazawa Chain",
+  //   "multicall-literal-contents/",
+  // );
 
-  // MELD Chain Testnet
-  verifyContract(
-    "0x769eE5A8e82C15C1b6E358f62aC8eb6E3AbE8dC5",
-    "333000333",
-    "MELD Chain",
-    "multicall-literal-contents/",
-  );
+  // // MELD Chain Testnet
+  // verifyContract(
+  //   "0x769eE5A8e82C15C1b6E358f62aC8eb6E3AbE8dC5",
+  //   "333000333",
+  //   "MELD Chain",
+  //   "multicall-literal-contents/",
+  // );
 
   // Kiwi Subnet
   verifyContract(
@@ -1336,13 +1342,13 @@ describe("Test Supported Chains", function () {
     "shared/",
   );
 
-  // Tiltyard Subnet
-  verifyContract(
-    "0xfd52e1A54442aC8d6a7C54713f99D0dc113df220",
-    "1127469",
-    "Tiltyard Subnet",
-    "multicall-src/",
-  );
+  // // Tiltyard Subnet
+  // verifyContract(
+  //   "0xfd52e1A54442aC8d6a7C54713f99D0dc113df220",
+  //   "1127469",
+  //   "Tiltyard Subnet",
+  //   "multicall-src/",
+  // );
 
   // Polygon zkEVM Mainnet
   verifyContract(
@@ -1514,7 +1520,7 @@ describe("Test Supported Chains", function () {
 
   // Auroria Testnet
   verifyContract(
-    "0x317306CE2b9CE1C8f419bfB2E480b4f000FB6B09",
+    "0xe446f231A55e8a376ec7cF5Ae7345f91BBAb5D8E",
     "205205",
     "Auroria Testnet",
     "shared/",
@@ -1568,21 +1574,21 @@ describe("Test Supported Chains", function () {
     "shared/",
   );
 
-  // Garnet Holesky
-  verifyContract(
-    "0x81EbbEDEd806Dbaa6ccD5a9D6D88D0d90B70dfc9",
-    "17069",
-    "Garnet Holesky",
-    "shared/",
-  );
+  // // Garnet Holesky
+  // verifyContract(
+  //   "0x81EbbEDEd806Dbaa6ccD5a9D6D88D0d90B70dfc9",
+  //   "17069",
+  //   "Garnet Holesky",
+  //   "shared/",
+  // );
 
-  // PlayFair Testnet Subnet
-  verifyContract(
-    "0x9be71dB4693657625F92359d046c513Bb35F96db",
-    "12898",
-    "PlayFair Testnet Subnet",
-    "shared/",
-  );
+  // // PlayFair Testnet Subnet
+  // verifyContract(
+  //   "0x9be71dB4693657625F92359d046c513Bb35F96db",
+  //   "12898",
+  //   "PlayFair Testnet Subnet",
+  //   "shared/",
+  // );
 
   // HOME Verse Mainnet
   verifyContract(
@@ -1748,6 +1754,14 @@ describe("Test Supported Chains", function () {
     "0x0cfE351147DEb353a57623859F7b2A4984645433",
     "48899",
     "Zircuit Testnet",
+    "shared/",
+  );
+
+  // Zircuit Garfield Testnet
+  verifyContract(
+    "0x0cfE351147DEb353a57623859F7b2A4984645433",
+    "48898",
+    "Zircuit Garfield Testnet",
     "shared/",
   );
 
