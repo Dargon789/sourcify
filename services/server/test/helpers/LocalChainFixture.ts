@@ -11,8 +11,11 @@ import nock from "nock";
 import storageContractArtifact from "../testcontracts/Storage/Storage.json";
 import storageContractMetadata from "../testcontracts/Storage/metadata.json";
 import storageContractMetadataModified from "../testcontracts/Storage/metadataModified.json";
+import storageJsonInput from "../testcontracts/Storage/StorageJsonInput.json";
 import { ChildProcess, spawn } from "child_process";
 import treeKill from "tree-kill";
+import { SolidityMetadataContract } from "@ethereum-sourcify/lib-sourcify";
+import type { Metadata } from "@ethereum-sourcify/lib-sourcify";
 
 const storageContractSourcePath = path.join(
   __dirname,
@@ -47,12 +50,14 @@ export class LocalChainFixture {
   defaultContractMetadata = Buffer.from(
     JSON.stringify(storageContractMetadata),
   );
-  defaultContractMetadataObject = storageContractMetadata;
+  defaultContractMetadataObject = storageContractMetadata as Metadata;
   defaultContractModifiedMetadata = Buffer.from(
     JSON.stringify(storageContractMetadataModified),
   );
-  defaultContractModifiedSourceIpfs = getModifiedSourceIpfs();
+  defaultContractMetadataWithModifiedIpfsHash =
+    getMetadataWithModifiedIpfsHash();
   defaultContractArtifact = storageContractArtifact;
+  defaultContractJsonInput = storageJsonInput;
 
   private _chainId?: string;
   private _localSigner?: JsonRpcSigner;
@@ -116,7 +121,7 @@ export class LocalChainFixture {
         path.join(__dirname, "..", "mocks", "ipfs"),
       );
       for (const ipfsKey of Object.keys(mockContent)) {
-        nock(process.env.IPFS_GATEWAY || "")
+        nock(SolidityMetadataContract.getGlobalIpfsGateway().url || "")
           .persist()
           .get("/" + ipfsKey)
           .reply(function () {
@@ -200,7 +205,7 @@ function stopHardhatNetwork(hardhatNodeProcess: ChildProcess) {
 }
 
 // Changes the IPFS hash inside the metadata file to make the source unfetchable
-function getModifiedSourceIpfs(): Buffer {
+function getMetadataWithModifiedIpfsHash(): Metadata {
   const ipfsAddress =
     storageContractMetadata.sources["project:/contracts/Storage.sol"].urls[1];
   // change the last char in ipfs hash of the source file
@@ -215,5 +220,5 @@ function getModifiedSourceIpfs(): Buffer {
   );
   modifiedIpfsMetadata.sources["project:/contracts/Storage.sol"].urls[1] =
     modifiedIpfsAddress;
-  return Buffer.from(JSON.stringify(modifiedIpfsMetadata));
+  return modifiedIpfsMetadata;
 }

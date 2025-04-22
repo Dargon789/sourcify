@@ -55,15 +55,5 @@ module.exports = {
   ],
   // verify-deprecated endpoint used in services/database/scripts.mjs. Used when recreating the DB with deprecated chains that don't have an RPC.
   verifyDeprecated: false,
-  rateLimit: {
-    enabled: false,
-    // Check done with "startsWith"
-    whitelist: [
-      "10.", // internal IP range
-      "::ffff:10.",
-      "127.0.0.1",
-      "::ffff:127.0.0.1",
-      "::1",
-    ],
-  },
+  upgradeContract: false,
 };
