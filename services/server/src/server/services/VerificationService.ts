@@ -32,10 +32,13 @@ import os from "os";
 import {
   VerifyError,
   VerifyErrorExport,
+  VerifyFromEtherscanInput,
   type VerifyFromJsonInput,
   type VerifyFromMetadataInput,
   type VerifyOutput,
 } from "./workers/workerTypes";
+import { EtherscanResult } from "./utils/etherscan-util";
+import { asyncLocalStorage } from "../../common/async-context";
 
 export interface VerificationServiceOptions {
   initCompilers?: boolean;
@@ -94,6 +97,8 @@ export class VerificationService {
       filename: path.resolve(__dirname, "./workers/workerWrapper.js"),
       workerData: {
         fullpath: verificationWorkerFilename,
+        // We can use the environment variable because it is overwritten by setLogLevel at server startup
+        logLevel: process.env.NODE_LOG_LEVEL,
         sourcifyChainInstanceMap,
         solcRepoPath: options.solcRepoPath,
         solJsonRepoPath: options.solJsonRepoPath,
@@ -282,6 +287,7 @@ export class VerificationService {
       compilerVersion,
       compilationTarget,
       creationTransactionHash,
+      traceId: asyncLocalStorage.getStore()?.traceId,
     };
 
     const task = this.workerPool
@@ -316,10 +322,42 @@ export class VerificationService {
       metadata,
       sources,
       creationTransactionHash,
+      traceId: asyncLocalStorage.getStore()?.traceId,
     };
 
     const task = this.workerPool
       .run(input, { name: "verifyFromMetadata" })
+      .then((output: VerifyOutput) => {
+        return this.handleWorkerResponse(verificationId, output);
+      })
+      .finally(() => {
+        this.runningTasks.delete(task);
+      });
+    this.runningTasks.add(task);
+
+    return verificationId;
+  }
+
+  public async verifyFromEtherscanViaWorker(
+    verificationEndpoint: string,
+    chainId: string,
+    address: string,
+    etherscanResult: EtherscanResult,
+  ): Promise<VerificationJobId> {
+    const verificationId = await this.storageService.performServiceOperation(
+      "storeVerificationJob",
+      [new Date(), chainId, address, verificationEndpoint],
+    );
+
+    const input: VerifyFromEtherscanInput = {
+      chainId,
+      address,
+      etherscanResult,
+      traceId: asyncLocalStorage.getStore()?.traceId,
+    };
+
+    const task = this.workerPool
+      .run(input, { name: "verifyFromEtherscan" })
       .then((output: VerifyOutput) => {
         return this.handleWorkerResponse(verificationId, output);
       })

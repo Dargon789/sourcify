@@ -6,7 +6,10 @@ import path from "path";
 import addContext from "mochawesome/addContext";
 import { assertVerification } from "../helpers/assertions";
 import testEtherscanContracts from "../helpers/etherscanInstanceContracts.json";
-import type { SourcifyChain } from "@ethereum-sourcify/lib-sourcify";
+import type {
+  SourcifyChain,
+  VerificationStatus,
+} from "@ethereum-sourcify/lib-sourcify";
 import config from "config";
 // @ts-ignore
 config["session"].storeType = "memory";
@@ -14,7 +17,7 @@ config["session"].storeType = "memory";
 type ChainApiResponse = Pick<
   SourcifyChain,
   "name" | "title" | "chainId" | "rpc" | "supported"
-> & { etherscanAPI: string };
+> & { etherscanAPI: boolean };
 
 const TEST_TIME = process.env.TEST_TIME || "60000"; // 30 seconds
 const CUSTOM_PORT = 5556;
@@ -363,12 +366,12 @@ describe("Test Supported Chains", function () {
   );
 
   // Rollux Mainnet
-  verifyContract(
-    "0x1187124eC74e2A2F420540C338186dD702cF6340",
-    "570",
-    "Rollux Mainnet",
-    "shared/",
-  );
+  // verifyContract(
+  //   "0x1187124eC74e2A2F420540C338186dD702cF6340",
+  //   "570",
+  //   "Rollux Mainnet",
+  //   "shared/",
+  // );
 
   // Rollux Tanenbaum (testnet)
   // verifyContract(
@@ -1837,6 +1840,29 @@ describe("Test Supported Chains", function () {
     "shared/",
   );
 
+  // Etherlink
+  verifyContract(
+    "0xec5504BcE3BCE4F1c4088a6A150A4A8C840945a7",
+    "42793",
+    "Etherlink",
+    "shared/",
+  );
+
+  // Etherlink Testnet
+  verifyContract(
+    "0x5827317D75D53E7a7901657307209bC684B8EcDc",
+    "128123",
+    "Etherlink Testnet",
+    "shared/",
+  );
+  // peaq
+  verifyContract(
+    "0x3ef7f3E38704eD3702D105094Bbb8562BE51b569",
+    "3338",
+    "peaq Mainnet",
+    "shared/",
+  );
+
   it("should have included Etherscan contracts for all testedChains having etherscanAPI", function (done) {
     const missingEtherscanTests: ChainApiResponse[] = [];
     supportedChains
@@ -1897,7 +1923,7 @@ describe("Test Supported Chains", function () {
     chainId: string,
     chainName: string,
     sourceAndMetadataDir: string, // folder
-    expectedStatus = "perfect",
+    expectedStatus: VerificationStatus = "perfect",
   ) {
     // If it is a pull request for adding new chain support, only test the new chain
     if (newAddedChainIds.length && !newAddedChainIds.includes(chainId)) return;

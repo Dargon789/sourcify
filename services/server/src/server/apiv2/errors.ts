@@ -14,6 +14,8 @@ import {
   SourcifyLibErrorParameters,
 } from "@ethereum-sourcify/lib-sourcify";
 import { TooManyRequests } from "../../common/errors/TooManyRequests";
+import { BadGatewayError } from "../../common/errors/BadGatewayError";
+import { JobErrorData } from "../services/utils/database-util";
 
 export type ErrorCode =
   | VerificationErrorCode
@@ -21,9 +23,14 @@ export type ErrorCode =
   | "route_not_found"
   | "unsupported_chain"
   | "invalid_parameter"
+  | "invalid_json"
   | "proxy_resolution_error"
   | "job_not_found"
-  | "duplicate_verification_request";
+  | "duplicate_verification_request"
+  | "etherscan_request_failed"
+  | "etherscan_limit"
+  | "not_etherscan_verified"
+  | "malformed_etherscan_response";
 
 export interface GenericErrorResponse {
   customCode: ErrorCode;
@@ -38,6 +45,7 @@ export interface MatchingErrorResponse extends GenericErrorResponse {
   onchainCreationCode?: string;
   onchainRuntimeCode?: string;
   creationTransactionHash?: string;
+  errorData?: JobErrorData;
 }
 
 export class InternalError extends InternalServerError {
@@ -131,6 +139,71 @@ export class AlreadyVerifiedError extends ConflictError {
   }
 }
 
+export class EtherscanRequestFailedError extends BadGatewayError {
+  payload: GenericErrorResponse;
+
+  constructor(message: string) {
+    super(message);
+    this.payload = {
+      customCode: "etherscan_request_failed",
+      message,
+      errorId: uuidv4(),
+    };
+  }
+}
+
+export class EtherscanLimitError extends TooManyRequests {
+  payload: GenericErrorResponse;
+
+  constructor(message: string) {
+    super(message);
+    this.payload = {
+      customCode: "etherscan_limit",
+      message,
+      errorId: uuidv4(),
+    };
+  }
+}
+
+export class NotEtherscanVerifiedError extends NotFoundError {
+  payload: GenericErrorResponse;
+
+  constructor(message: string) {
+    super(message);
+    this.payload = {
+      customCode: "not_etherscan_verified",
+      message,
+      errorId: uuidv4(),
+    };
+  }
+}
+
+export class MalformedEtherscanResponseError extends BadRequestError {
+  payload: GenericErrorResponse;
+
+  constructor(message: string) {
+    super(message);
+    this.payload = {
+      customCode: "malformed_etherscan_response",
+      message,
+      errorId: uuidv4(),
+    };
+  }
+}
+
+export class InvalidJsonError extends BadRequestError {
+  payload: GenericErrorResponse;
+
+  constructor(message: string) {
+    super(message);
+    this.payload = {
+      customCode: "invalid_json",
+      message,
+      errorId: uuidv4(),
+    };
+  }
+}
+
 // Maps OpenApiValidator errors to our custom error format
 export function errorHandler(
   err: any,
@@ -141,6 +214,11 @@ export function errorHandler(
   // Let errors pass that already match the v2 error format
   if (err.payload) {
     next(err);
+    return;
+  }
+
+  if (err instanceof SyntaxError) {
+    next(new InvalidJsonError(err.message));
     return;
   }
 

@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## sourcify-server@3.2.0 - 2025-06-18
+
+- Add new endpoint /v2/contract/all-chains/{address} to get all verified deployments of a contract on all chains #2183
+- Handle invalid json body error, throw if unable to fetch the compiler #2179 
+- Throw an error on conflict when inserting a verified_contract #2176 
+- Add contract creation transaction fetching via VeChain Stats #2182 
+- Update README docs and quick start docker-compose files for easier setup
+- New chains:
+  - Peaq Mainnet (3338)
+
+## sourcify-server@3.1.3 - 2025-05-20
+
+- Use Etherscan API v2 (#2158) 
+
+## sourcify-server@3.1.2 - 2025-05-12
+
+- Add warning log if no database is configured (#2147)
+- Clarify that a Postgres database is required for API v2 (#2144)
+- Update dependencies
+
+## sourcify-server@3.1.1 - 2025-05-06
+
+- Fix missing compilation.metadata field in upgrade script (#2135)
+- Fix traceId not logged inside worker when verifying via Etherscan import (#2137)
+- Turn off Rollux Mainnet (570)
+- Use default telos RPCs
+
+## sourcify-server@3.1.0 - 2025-04-30
+
+- Add API v2 verification endpoints:
+  - POST `/v2/verify/{chainId}/{address}`
+  - POST `/v2/verify/metadata/{chainId}/{address}`
+  - POST `/v2/verify/etherscan/{chainId}/{address}`
+- Deprecate API v1
+- Add options to configure libSourcify in server
+- Add options to configure the new Piscina worker for v2 verification
+- Add new chains:
+  - Superseed Mainnet (5330)
+  - Corn Mainnet (21000000)
+  - Etherlink (42793)
+  - Etherlink Testnet (128123)
+- Fix SIGTERM handling of server containers
+- Fix missing error handler when no metadata.json found
+- Improve logging
+- Copy fetchContractCreationTxUsing for an unknown chain
+- Add docker compose configuration for running locally
+- Update dependencies
+
 ## sourcify-server@3.0.0 - 2025-04-09
 
 - Integrate new lib-sourcify classes in server (#1960) 

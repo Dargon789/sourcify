@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/ethereum/sourcify/branch/staging/graph/badge.svg?token=eN6XDAwWfV&flag=lib-sourcify)](https://codecov.io/gh/ethereum/sourcify)
 
-lib-sourcify is [Sourcify](https://sourcify.dev)'s reusable backbone library for verifying contracts. Version 2 introduces a completely redesigned architecture with improved abstractions, better support for both Solidity and Vyper contracts, and a more flexible verification process.
+lib-sourcify is [Sourcify](https://sourcify.dev)'s reusable backbone library for verifying contracts. Version 2 introduces a completely redesigned architecture with improved abstractions, better support for both Solidity and Vyper contracts, a more flexible verification process, and browser support.
 
 ## Overview
 
@@ -110,6 +110,27 @@ console.log(verification.status); // { runtimeMatch: 'perfect', creationMatch: n
 
 This example shows the complete verification flow for a Solidity contract using standard JSON input. For Vyper contracts or more advanced use cases, see the detailed sections below.
 
+## Using in browser
+
+For browser usage, we recommend using [web-solc](https://github.com/gnidan/web-solc) instead of `@ethereum-sourcify/compilers`. Here's an example of how to implement the `ISolidityCompiler` interface with `web-solc`:
+
+```typescript
+import { ISolidityCompiler, SolidityJsonInput } from "@ethereum-sourcify/lib-sourcify";
+import { fetchSolc } from "web-solc";
+
+class Solc implements ISolidityCompiler {
+  async compile(
+    version: string,
+    solcJsonInput: SolidityJsonInput
+  ): Promise<any> {
+    const { compile } = await fetchSolc(version);
+    return await compile(solcJsonInput);
+  }
+}
+
+const solc = new Solc();
+```
+
 ## Architecture
 
 lib-sourcify v2 consists of several key components:
@@ -191,6 +212,8 @@ setLibSourcifyLogger({
 ## Compiler Setup
 
 The `lib-sourcify` library does not come with compilers as dependencies. Instead, you need to provide a class that implements either the `ISolidityCompiler` or `IVyperCompiler` interface and pass it to any function that requires a compiler. We suggest you to use the official [`@ethereum-sourcify/compilers`](https://github.com/ethereum/sourcify/tree/staging/packages/compilers) package.
+
+In the case of an error in the `compile` function, `lib-sourcify` expects the thrown error to have a public `errors` property containing the compilation output's `errors` property.
 
 ### Solidity Compiler Example
 

@@ -20,11 +20,20 @@ import { v4 as uuidv4 } from "uuid";
 import { getCreatorTx } from "../utils/contract-creation-util";
 import type {
   VerifyErrorExport,
+  VerifyFromEtherscanInput,
   VerifyFromJsonInput,
   VerifyFromMetadataInput,
   VerifyOutput,
+  VerificationWorkerInput,
 } from "./workerTypes";
-import logger from "../../../common/logger";
+import logger, { setLogLevel } from "../../../common/logger";
+import {
+  ProcessedEtherscanResult,
+  isVyperResult,
+  processSolidityResultFromEtherscan,
+  processVyperResultFromEtherscan,
+} from "../utils/etherscan-util";
+import { asyncLocalStorage } from "../../../common/async-context";
 
 export const filename = resolve(__filename);
 
@@ -36,6 +45,8 @@ const initWorker = () => {
   if (chainRepository && solc && vyper) {
     return;
   }
+
+  setLogLevel(Piscina.workerData.logLevel || "info");
 
   const sourcifyChainInstanceMap = Piscina.workerData
     .sourcifyChainInstanceMap as { [chainId: string]: SourcifyChainInstance };
@@ -56,7 +67,35 @@ const initWorker = () => {
   vyper = new VyperLocal(Piscina.workerData.vyperRepoPath);
 };
 
-export async function verifyFromJsonInput({
+async function runWorkerFunctionWithContext<T extends VerificationWorkerInput>(
+  workerFunction: (input: T) => Promise<VerifyOutput>,
+  input: T,
+): Promise<VerifyOutput> {
+  initWorker();
+  // We need to inject the traceId for the logger here since the worker is running in its own thread.
+  const context = { traceId: input.traceId };
+  return asyncLocalStorage.run(context, workerFunction, input);
+}
+
+export async function verifyFromJsonInput(
+  input: VerifyFromJsonInput,
+): Promise<VerifyOutput> {
+  return runWorkerFunctionWithContext(_verifyFromJsonInput, input);
+}
+
+export async function verifyFromMetadata(
+  input: VerifyFromMetadataInput,
+): Promise<VerifyOutput> {
+  return runWorkerFunctionWithContext(_verifyFromMetadata, input);
+}
+
+export async function verifyFromEtherscan(
+  input: VerifyFromEtherscanInput,
+): Promise<VerifyOutput> {
+  return runWorkerFunctionWithContext(_verifyFromEtherscan, input);
+}
+
+async function _verifyFromJsonInput({
   chainId,
   address,
   jsonInput,
@@ -64,8 +103,6 @@ export async function verifyFromJsonInput({
   compilationTarget,
   creationTransactionHash,
 }: VerifyFromJsonInput): Promise<VerifyOutput> {
-  initWorker();
-
   let compilation: SolidityCompilation | VyperCompilation | undefined;
   try {
     if (jsonInput.language === "Solidity") {
@@ -124,15 +161,13 @@ export async function verifyFromJsonInput({
   };
 }
 
-export async function verifyFromMetadata({
+async function _verifyFromMetadata({
   chainId,
   address,
   metadata,
   sources,
   creationTransactionHash,
 }: VerifyFromMetadataInput): Promise<VerifyOutput> {
-  initWorker();
-
   const sourcesList = Object.entries(sources).map(([path, content]) => ({
     path,
     content,
@@ -204,6 +239,33 @@ export async function verifyFromMetadata({
   return {
     verificationExport: verification.export(),
   };
+}
+
+async function _verifyFromEtherscan({
+  chainId,
+  address,
+  etherscanResult,
+}: VerifyFromEtherscanInput): Promise<VerifyOutput> {
+  let processedResult: ProcessedEtherscanResult;
+  if (isVyperResult(etherscanResult)) {
+    processedResult = await processVyperResultFromEtherscan(
+      etherscanResult,
+      true,
+    );
+  } else {
+    processedResult = processSolidityResultFromEtherscan(etherscanResult, true);
+  }
+
+  return _verifyFromJsonInput({
+    chainId,
+    address,
+    jsonInput: processedResult.jsonInput,
+    compilerVersion: processedResult.compilerVersion,
+    compilationTarget: {
+      name: processedResult.contractName,
+      path: processedResult.contractPath,
+    },
+  });
 }
 
 function createErrorExport(

@@ -7,16 +7,11 @@ import { resolveRefs } from "json-refs";
 import bodyParser from "body-parser";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const fileUpload = require("express-fileupload");
-import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { asyncLocalStorage } from "../common/async-context";
 
 // local imports
-import logger, {
-  LogLevels,
-  setLogLevel,
-  validLogLevels,
-} from "../common/logger";
+import logger, { setLogLevel } from "../common/logger";
 import routes from "./routes";
 import genericErrorHandler from "../common/errors/GenericErrorHandler";
 import { initDeprecatedRoutes } from "./apiv1/deprecated.routes";
@@ -28,7 +23,6 @@ import {
   getLibSourcifyLoggerLevel,
   ISolidityCompiler,
   IVyperCompiler,
-  setLibSourcifyLoggerLevel,
   SolidityMetadataContract,
   SourcifyChain,
   SourcifyChainMap,
@@ -38,7 +32,7 @@ import { SessionOptions } from "express-session";
 import { makeV1ValidatorFormats } from "./apiv1/validation";
 import { errorHandler as v2ErrorHandler } from "./apiv2/errors";
 import http from "http";
-import { setCompilersLoggerLevel } from "@ethereum-sourcify/compilers";
+import { RWStorageIdentifiers } from "./services/storageServices/identifiers";
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -66,7 +60,7 @@ export interface ServerOptions {
   sessionOptions: SessionOptions;
   sourcifyPrivateToken?: string;
   libSourcifyConfig?: LibSourcifyConfig;
-  logLevel?: number;
+  logLevel?: string;
 }
 
 export class Server {
@@ -81,14 +75,7 @@ export class Server {
     verificationServiceOptions: VerificationServiceOptions,
     storageServiceOptions: StorageServiceOptions,
   ) {
-    if (options.logLevel !== undefined) {
-      if (!validLogLevels.includes(options.logLevel)) {
-        throw new Error(`Invalid log level: ${options.logLevel}`);
-      }
-      setLogLevel(LogLevels[options.logLevel]);
-      setLibSourcifyLoggerLevel(options.logLevel);
-      setCompilersLoggerLevel(options.logLevel);
-    }
+    setLogLevel(options.logLevel || "info");
 
     this.port = options.port;
     logger.info("Server port set", { port: this.port });
@@ -126,6 +113,14 @@ export class Server {
       storageServiceOptions,
     );
 
+    if (
+      !this.services.storage.rwServices[RWStorageIdentifiers.SourcifyDatabase]
+    ) {
+      logger.warn(
+        "No database configured. The database is recommended as storage service. API v2 is disabled without database.",
+      );
+    }
+
     const handleShutdownSignal = async () => {
       await this.shutdown();
       process.exit(0);
@@ -139,6 +134,28 @@ export class Server {
     this.app.set("verifyDeprecated", options.verifyDeprecated);
     this.app.set("upgradeContract", options.upgradeContract);
     this.app.set("services", this.services);
+
+    // Session API endpoints require non "*" origins because of the session cookies
+    const sessionPaths = [
+      "/session", // all paths /session/verify /session/input-files etc.
+      // legacy endpoint naming below
+      "/input-files",
+      "/restart-session",
+      "/verify-validated",
+    ];
+    this.app.use((req, res, next) => {
+      // startsWith to match /session*
+      if (sessionPaths.some((substr) => req.path.startsWith(substr))) {
+        return cors({
+          origin: options.corsAllowedOrigins,
+          credentials: true,
+        })(req, res, next);
+      }
+      // * for all non-session paths
+      return cors({
+        origin: "*",
+      })(req, res, next);
+    });
 
     this.app.use(
       bodyParser.urlencoded({
@@ -234,28 +251,6 @@ export class Server {
       }),
     );
 
-    // Session API endpoints require non "*" origins because of the session cookies
-    const sessionPaths = [
-      "/session", // all paths /session/verify /session/input-files etc.
-      // legacy endpoint naming below
-      "/input-files",
-      "/restart-session",
-      "/verify-validated",
-    ];
-    this.app.use((req, res, next) => {
-      // startsWith to match /session*
-      if (sessionPaths.some((substr) => req.path.startsWith(substr))) {
-        return cors({
-          origin: options.corsAllowedOrigins,
-          credentials: true,
-        })(req, res, next);
-      }
-      // * for all non-session paths
-      return cors({
-        origin: "*",
-      })(req, res, next);
-    });
-
     // Need this for secure cookies to work behind a proxy. See https://expressjs.com/en/guide/behind-proxies.html
     // true means the leftmost IP in the X-Forwarded-* header is used
     // Assuming the client ip is 2.2.2.2, reverse proxy 192.168.1.5
@@ -327,15 +322,4 @@ export class Server {
       },
     );
   }
-}
-
-function hash(data: string) {
-  return crypto.createHash("sha256").update(data).digest("hex");
-}
-
-function getIp(req: Request) {
-  if (req.headers["x-forwarded-for"]) {
-    return req.headers["x-forwarded-for"].toString();
-  }
-  return req.ip;
 }

@@ -10,7 +10,7 @@ import {
   Contract,
 } from "ethers";
 import { assertVerificationSession, assertVerification } from "./assertions";
-import chai from "chai";
+import chai, { expect } from "chai";
 import chaiHttp from "chai-http";
 import path from "path";
 import { promises as fs, readFileSync } from "fs";
@@ -19,6 +19,7 @@ import type { Done } from "mocha";
 import { LocalChainFixture } from "./LocalChainFixture";
 import { Pool } from "pg";
 import sinon from "sinon";
+import { VerificationStatus } from "@ethereum-sourcify/lib-sourcify";
 
 chai.use(chaiHttp);
 
@@ -93,7 +94,7 @@ export async function verifyContract(
   creatorTxHash?: string,
   partial: boolean = false,
 ) {
-  await chai
+  const res = await chai
     .request(serverFixture.server.app)
     .post("/")
     .field("address", contractAddress || chainFixture.defaultContractAddress)
@@ -115,6 +116,16 @@ export async function verifyContract(
         ? chainFixture.defaultContractModifiedSource
         : chainFixture.defaultContractSource,
     );
+  expect(
+    res.status,
+    `Verification failed for ${contractAddress} on chain ${chainFixture.chainId}`,
+  ).to.equal(200);
+  expect(res.body.result.length).to.equal(1);
+  expect(res.body.result[0].status).to.equal(partial ? "partial" : "perfect");
+  expect(res.body.result[0].chainId).to.equal(chainFixture.chainId);
+  if (contractAddress) {
+    expect(res.body.result[0].address).to.equal(contractAddress);
+  }
 }
 
 export async function deployAndVerifyContract(
@@ -197,11 +208,11 @@ export async function callContractMethodWithTx(
   return txReceipt;
 }
 
-export function verifyAndAssertEtherscan(
+export function verifyAndAssertEtherscanViaApiV1(
   serverFixture: ServerFixture,
   chainId: string,
   address: string,
-  expectedStatus: string,
+  expectedStatus: VerificationStatus,
   done: Done,
 ) {
   const request = chai
@@ -226,7 +237,7 @@ export function verifyAndAssertEtherscanSession(
   serverFixture: ServerFixture,
   chainId: string,
   address: string,
-  expectedStatus: string,
+  expectedStatus: VerificationStatus,
   done: Done,
 ) {
   chai
