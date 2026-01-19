@@ -1,14 +1,14 @@
-import { AuxdataStyle } from '@ethereum-sourcify/bytecode-utils';
-import {
+import type { AuxdataStyle } from '@ethereum-sourcify/bytecode-utils';
+import type {
   CompilationTarget,
   CompiledContractCborAuxdata,
   CompilationLanguage,
   StringMap,
-  CompilationError,
   ISolidityCompiler,
   IVyperCompiler,
 } from './CompilationTypes';
-import {
+import { CompilationError } from './CompilationTypes';
+import type {
   ImmutableReferences,
   SolidityJsonInput,
   SolidityOutput,
@@ -19,7 +19,7 @@ import {
   VyperOutput,
   VyperOutputContract,
 } from '@ethereum-sourcify/compilers-types';
-import { logInfo, logSilly, logWarn } from '../logger';
+import { logDebug, logInfo, logSilly, logWarn } from '../logger';
 
 function cleanCompilerVersion(version: string): string {
   // Remove non-numerical characters from the beginning of the version string
@@ -69,7 +69,7 @@ export abstract class AbstractCompilation {
     const version = this.compilerVersion;
 
     const compilationStartTime = Date.now();
-    logInfo('Compiling contract', {
+    logDebug('Compiling contract', {
       version,
       contract: this.compilationTarget.name,
       path: this.compilationTarget.path,

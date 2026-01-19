@@ -1,14 +1,15 @@
 import DecentralizedStorageFetcher from "./DecentralizedStorageFetcher";
 import assert from "assert";
 import { EventEmitter } from "stream";
-import {
+import type {
   FetchRequestRPC,
-  SourcifyChain,
+  SourcifyRpc,
 } from "@ethereum-sourcify/lib-sourcify";
+import { SourcifyChain } from "@ethereum-sourcify/lib-sourcify";
 import logger from "./logger";
 import "./loggerServer"; // Start the dynamic log level server
 import ChainMonitor from "./ChainMonitor";
-import {
+import type {
   KnownDecentralizedStorageFetchers,
   MonitorChain,
   MonitorConfig,
@@ -17,6 +18,7 @@ import {
 import dotenv from "dotenv";
 import defaultConfig from "./defaultConfig";
 import path from "path";
+import SimilarityVerificationClient from "./SimilarityVerificationClient";
 
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
@@ -24,6 +26,7 @@ export default class Monitor extends EventEmitter {
   private chainMonitors: ChainMonitor[];
   private sourceFetchers: KnownDecentralizedStorageFetchers = {};
   private config: MonitorConfig;
+  private similarityVerificationClient: SimilarityVerificationClient;
 
   constructor(
     chainsToMonitor: MonitorChain[],
@@ -55,15 +58,21 @@ export default class Monitor extends EventEmitter {
       );
     }
 
+    const similarityBaseUrls = this.config.sourcifyServerURLs
+      .map((url) => url.replace(/\/+$/, ""))
+      .filter(Boolean);
+    this.similarityVerificationClient = new SimilarityVerificationClient(
+      similarityBaseUrls,
+      this.config.similarityVerification,
+    );
+
     const sourcifyChains = chainsToMonitor.map((chain) => {
       if (chain instanceof SourcifyChain) {
         return chain;
       } else {
         return new SourcifyChain({
           chainId: chain.chainId,
-          rpcs: authenticateRpcs(chain).map((rpc) => ({
-            rpc,
-          })),
+          rpcs: authenticateRpcs(chain),
           name: chain.name,
           supported: true,
         });
@@ -93,7 +102,10 @@ export default class Monitor extends EventEmitter {
       }
     }
 
-    if (chainsInConfigButNotChainsToMonitor.length > 0) {
+    if (
+      chainsInConfigButNotChainsToMonitor.length > 0 &&
+      process.env.NODE_ENV === "production"
+    ) {
       throw new Error(
         `Chain configs found for chains that are not being monitored: ${chainsInConfigButNotChainsToMonitor.join(
           ",",
@@ -102,7 +114,13 @@ export default class Monitor extends EventEmitter {
     }
 
     this.chainMonitors = sourcifyChains.map(
-      (chain) => new ChainMonitor(chain, this.sourceFetchers, this.config),
+      (chain) =>
+        new ChainMonitor(
+          chain,
+          this.sourceFetchers,
+          this.config,
+          this.similarityVerificationClient,
+        ),
     );
   }
 
@@ -131,9 +149,7 @@ export default class Monitor extends EventEmitter {
   };
 }
 
-export function authenticateRpcs(
-  chain: MonitorChain,
-): (string | FetchRequestRPC)[] {
+export function authenticateRpcs(chain: MonitorChain): SourcifyRpc[] {
   return chain.rpc.map((rpc) => {
     if (typeof rpc === "string") {
       if (rpc?.includes("ethpandaops.io")) {
@@ -151,9 +167,9 @@ export function authenticateRpcs(
             },
           ],
         };
-        return fetchRequestRpc;
+        return { rpc: fetchRequestRpc };
       }
-      return rpc;
+      return { rpc };
     }
     if (rpc?.type === "ApiKey") {
       const apiKey = process.env[rpc.apiKeyEnvName] || "";
@@ -162,7 +178,21 @@ export function authenticateRpcs(
           `API key ${rpc.apiKeyEnvName} not found in environment variables`,
         );
       }
-      return rpc.url.replace("{API_KEY}", apiKey);
+      let secretUrl = rpc.url.replace("{API_KEY}", apiKey);
+      if (rpc?.subDomainEnvName) {
+        // subDomain is optional
+        const subDomain = process.env[rpc.subDomainEnvName];
+        if (!subDomain) {
+          throw new Error(
+            `Subdomain ${rpc.subDomainEnvName} not found in environment variables`,
+          );
+        }
+        secretUrl = secretUrl.replace("{SUBDOMAIN}", subDomain);
+      }
+      return {
+        rpc: secretUrl,
+        ...(rpc.traceSupport ? { traceSupport: rpc.traceSupport } : {}),
+      };
     }
     throw new Error("Invalid rpc object: " + JSON.stringify(rpc));
   });

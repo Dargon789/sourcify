@@ -3,10 +3,11 @@ import path from 'path';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
 import semver from 'semver';
-import { Worker, WorkerOptions } from 'worker_threads';
+import type { WorkerOptions } from 'worker_threads';
+import { Worker } from 'worker_threads';
 import { logDebug, logError, logInfo, logWarn } from '../logger';
 import { asyncExec, CompilerError, fetchWithBackoff } from './common';
-import {
+import type {
   SolidityJsonInput,
   SolidityOutput,
 } from '@ethereum-sourcify/compilers-types';
@@ -70,7 +71,7 @@ export async function useSolidityCompiler(
   }
   let startCompilation: number;
   if (solcPath && !forceEmscripten) {
-    logInfo('Compiling with solc binary', { version, solcPath });
+    logDebug('Compiling with solc binary', { version, solcPath });
     startCompilation = Date.now();
     try {
       compiled = await asyncExec(
@@ -85,7 +86,7 @@ export async function useSolidityCompiler(
       throw error;
     }
   } else {
-    logInfo('Compiling with solc-js', { version });
+    logDebug('Compiling with solc-js', { version });
     const solJson = await getSolcJs(solJsonRepoPath, version);
     startCompilation = Date.now();
     if (solJson) {
@@ -114,7 +115,7 @@ export async function useSolidityCompiler(
   }
 
   const endCompilation = Date.now();
-  logInfo('Local compiler - Compilation done', {
+  logDebug('Local compiler - Compilation done', {
     compiler: 'solidity',
     timeInMs: endCompilation - startCompilation,
   });

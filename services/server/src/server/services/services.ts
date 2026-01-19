@@ -1,8 +1,7 @@
-import { StorageService, StorageServiceOptions } from "./StorageService";
-import {
-  VerificationService,
-  VerificationServiceOptions,
-} from "./VerificationService";
+import type { StorageServiceOptions } from "./StorageService";
+import { StorageService } from "./StorageService";
+import type { VerificationServiceOptions } from "./VerificationService";
+import { VerificationService } from "./VerificationService";
 
 export class Services {
   public verification: VerificationService;
@@ -26,5 +25,6 @@ export class Services {
 
   public async close() {
     await this.verification.close();
+    await this.storage.close();
   }
 }

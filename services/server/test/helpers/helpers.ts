@@ -1,24 +1,22 @@
 import config from "config";
-import {
-  ContractFactory,
-  Wallet,
+import type {
   JsonRpcSigner,
   JsonFragment,
   JsonRpcProvider,
   BytesLike,
-  Contract,
 } from "ethers";
+import { ContractFactory, Wallet, Contract } from "ethers";
 import { assertVerificationSession, assertVerification } from "./assertions";
 import chai, { expect } from "chai";
 import chaiHttp from "chai-http";
 import path from "path";
 import { promises as fs, readFileSync } from "fs";
-import { ServerFixture } from "./ServerFixture";
+import type { ServerFixture } from "./ServerFixture";
 import type { Done } from "mocha";
-import { LocalChainFixture } from "./LocalChainFixture";
-import { Pool } from "pg";
+import type { LocalChainFixture } from "./LocalChainFixture";
+import type { Pool } from "pg";
 import sinon from "sinon";
-import { VerificationStatus } from "@ethereum-sourcify/lib-sourcify";
+import type { VerificationStatus } from "@ethereum-sourcify/lib-sourcify";
 
 chai.use(chaiHttp);
 
@@ -55,11 +53,11 @@ export type DeploymentInfo = {
  */
 export async function deployFromAbiAndBytecodeForCreatorTxHash(
   signer: JsonRpcSigner,
-  abi: JsonFragment[],
+  abi: JsonFragment[] | undefined,
   bytecode: BytesLike | { object: string },
   args?: any[],
 ): Promise<DeploymentInfo> {
-  const contractFactory = new ContractFactory(abi, bytecode, signer);
+  const contractFactory = new ContractFactory(abi || [], bytecode, signer);
   console.log(`Deploying contract ${args?.length ? `with args ${args}` : ""}`);
   const deployment = await contractFactory.deploy(...(args || []));
   await deployment.waitForDeployment();

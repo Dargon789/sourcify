@@ -278,6 +278,13 @@ describe("Test Supported Chains", function () {
   // );
 
   verifyContract(
+    "0x03943C3ef00d92e130185CeBC0bcc435Def2cC94",
+    "42220",
+    "Celo Mainnet",
+    "42220/",
+  );
+
+  verifyContract(
     "0x0Ec727eD4b65Ca0e2D80A6a9fdA73D4d3bb042A6",
     "11142220",
     "Celo Sepolia Testnet",
@@ -973,6 +980,14 @@ describe("Test Supported Chains", function () {
     "0x00000000000000000000000000000000002265bb",
     "295",
     "Hedera Mainnet",
+    "shared/",
+  );
+
+  // Hedera Testnet
+  verifyContract(
+    "0x8DdDA03161b1105Bc53A3C644B2967905d0eAe6e",
+    "296",
+    "Hedera Testnet",
     "shared/",
   );
 
@@ -1766,6 +1781,14 @@ describe("Test Supported Chains", function () {
     "shared/",
   );
 
+  //OORT Testnet
+  verifyContract(
+    "0x55A6D202054A3DC83E3e64694ae9554B9354dA74",
+    "9700",
+    "OORT Testnet",
+    "shared/",
+  );
+
   //B2 Mainnet
   verifyContract(
     "0x3A3a009856AC673D91892b05068EB82080ff8744",
@@ -1956,6 +1979,64 @@ describe("Test Supported Chains", function () {
     "1597",
     "Reactive Network Mainnet",
     "shared/",
+  );
+
+  // ARC-testnet
+  verifyContract(
+    "0xcA11bde05977b3631167028862bE2a173976CA11",
+    "5042002",
+    "ARC-testnet",
+    "multicall-src/",
+    "partial",
+  );
+  // Sei Testnet
+  verifyContract(
+    "0x504294682d7A9941fCC1a5c3D847251df38E790B",
+    "1328",
+    "Sei Testnet",
+    "shared/",
+    "perfect",
+  );
+  // Sei Network
+  verifyContract(
+    "0xc9f275dc9c9d7451dAa5655d0105F0266b31347f",
+    "1329",
+    "Sei Network",
+    "shared/",
+    "perfect",
+  );
+
+  // Tempo Testnet (Andantino)
+  verifyContract(
+    "0x7ecedB5ca848e695ee8aB33cce9Ad1E1fe7865F8",
+    "42429",
+    "Tempo Testnet (Andantino)",
+    "shared/",
+    "perfect",
+  );
+
+  // Jovay Sepolia Testnet
+  verifyContract(
+    "0x63A2fA72305de66654bB95606190f5477abeAf36",
+    "2019775",
+    "Jovay Sepolia Testnet",
+    "shared/",
+  );
+  // Jovay Mainnet
+  verifyContract(
+    "0x63A2fA72305de66654bB95606190f5477abeAf36",
+    "5734951",
+    "Jovay Mainnet",
+    "shared/",
+  );
+
+  // Tempo Testnet (Moderato)
+  verifyContract(
+    "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed",
+    "42431",
+    "Tempo Testnet (Moderato)",
+    "createx/",
+    "partial",
   );
 
   it("should have included Etherscan contracts for all testedChains having etherscanAPI", function (done) {

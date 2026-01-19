@@ -1,20 +1,22 @@
 import { FileHash } from "./util";
-import { Block, TransactionResponse, getCreateAddress } from "ethers";
+import type { Block, TransactionResponse } from "ethers";
+import { getCreateAddress } from "ethers";
 import assert from "assert";
 import { EventEmitter } from "stream";
 import {
   AuxdataStyle,
   decode as bytecodeDecode,
 } from "@ethereum-sourcify/bytecode-utils";
-import { SourcifyChain } from "@ethereum-sourcify/lib-sourcify";
+import type { SourcifyChain } from "@ethereum-sourcify/lib-sourcify";
 import logger from "./logger";
-import {
+import type {
   KnownDecentralizedStorageFetchers,
   MonitorConfig,
   SourcifyRequestOptions,
 } from "./types";
 import PendingContract from "./PendingContract";
-import { Logger } from "winston";
+import type { Logger } from "winston";
+import type SimilarityVerificationClient from "./SimilarityVerificationClient";
 
 function createsContract(tx: TransactionResponse): boolean {
   return !tx.to;
@@ -30,6 +32,7 @@ export default class ChainMonitor extends EventEmitter {
   private sourceFetchers: KnownDecentralizedStorageFetchers;
   private sourcifyServerURLs: string[];
   private sourcifyRequestOptions: SourcifyRequestOptions;
+  private similarityVerificationClient: SimilarityVerificationClient;
 
   private chainLogger: Logger;
   private startBlock?: number;
@@ -41,15 +44,20 @@ export default class ChainMonitor extends EventEmitter {
   private bytecodeNumberOfTries: number;
   private running = false;
   private blockPauseLogInterval: NodeJS.Timeout | null = null;
+  private traceInterval: number;
+  private traceNumberOfTries: number;
+  private traceDelay: number;
 
   constructor(
     sourcifyChain: SourcifyChain,
     sourceFetchers: KnownDecentralizedStorageFetchers,
     monitorConfig: MonitorConfig,
+    similarityVerificationClient: SimilarityVerificationClient,
   ) {
     super();
     this.sourcifyChain = sourcifyChain;
     this.sourceFetchers = sourceFetchers; // TODO: handle multipe
+    this.similarityVerificationClient = similarityVerificationClient;
     this.chainLogger = logger.child({
       moduleName: "ChainMonitor #" + this.sourcifyChain.chainId,
       chainId: this.sourcifyChain.chainId,
@@ -71,6 +79,9 @@ export default class ChainMonitor extends EventEmitter {
     this.blockIntervalUpperLimit = chainConfig.blockIntervalUpperLimit;
     this.blockIntervalLowerLimit = chainConfig.blockIntervalLowerLimit;
     this.bytecodeNumberOfTries = chainConfig.bytecodeNumberOfTries;
+    this.traceInterval = chainConfig.traceInterval;
+    this.traceNumberOfTries = chainConfig.traceNumberOfTries;
+    this.traceDelay = chainConfig.traceDelay;
     this.chainLogger.info(
       "Created ChainMonitor",
       Object.fromEntries(
@@ -170,7 +181,6 @@ export default class ChainMonitor extends EventEmitter {
     this.chainLogger.silly("Block", block);
 
     for (const tx of block.prefetchedTransactions) {
-      // TODO: Check factory contracts with traces
       this.chainLogger.silly("Checking tx", {
         txHash: tx.hash,
         blockNumber: block.number,
@@ -184,6 +194,62 @@ export default class ChainMonitor extends EventEmitter {
           txHash: tx.hash,
         });
         this.processNewContract(tx.hash, address);
+      }
+    }
+
+    if (this.sourcifyChain.traceSupport) {
+      // Check factory contracts with traces
+      this.checkFactoryCreatedAddresses(block);
+    }
+  };
+
+  private async getCreatedAddressesWithRetries(
+    block: Block,
+  ): Promise<Record<string, string[]>> {
+    for (let i = this.traceNumberOfTries; i > 0; i--) {
+      this.chainLogger.debug("Fetching created addresses", {
+        retryNumber: this.traceNumberOfTries - i + 1,
+        blockNumber: block.number,
+        traceInterval: this.traceInterval,
+        maxRetries: this.traceNumberOfTries,
+      });
+
+      try {
+        const factoryCreatedAddresses =
+          await this.sourcifyChain.getCreatedAddressesFromBlockTraces(
+            block.number,
+          );
+        return factoryCreatedAddresses;
+      } catch (error: any) {
+        await new Promise((resolve) => setTimeout(resolve, this.traceInterval));
+        continue;
+      }
+    }
+
+    this.chainLogger.error("No retries left for fetching created addresses", {
+      blockNumber: block.number,
+    });
+    return {};
+  }
+
+  private checkFactoryCreatedAddresses = async (block: Block) => {
+    if (this.traceDelay > 0) {
+      // On some chains, it seems to take longer until traces are available from the rpc
+      await new Promise((resolve) => setTimeout(resolve, this.traceDelay));
+    }
+    const factoryCreatedAddresses =
+      await this.getCreatedAddressesWithRetries(block);
+    for (const [txHash, addresses] of Object.entries(factoryCreatedAddresses)) {
+      for (const address of addresses) {
+        this.chainLogger.info(
+          "Found new contract created by factory in block",
+          {
+            blockNumber: block.number,
+            address,
+            txHash,
+          },
+        );
+        this.processNewContract(txHash, address);
       }
     }
   };
@@ -285,6 +351,11 @@ export default class ChainMonitor extends EventEmitter {
           address,
           origin: metadataHash.origin,
         });
+        this.similarityVerificationClient.trigger(
+          this.sourcifyChain.chainId,
+          address,
+          creatorTxHash,
+        );
         return;
       }
 
@@ -299,6 +370,11 @@ export default class ChainMonitor extends EventEmitter {
         await pendingContract.assemble();
       } catch (err: any) {
         this.chainLogger.info("Couldn't assemble contract", { address, err });
+        this.similarityVerificationClient.trigger(
+          this.sourcifyChain.chainId,
+          address,
+          creatorTxHash,
+        );
         return;
       }
       if (!this.isEmpty(pendingContract.pendingSources)) {
@@ -306,6 +382,11 @@ export default class ChainMonitor extends EventEmitter {
           address: pendingContract.address,
           pendingSources: pendingContract.pendingSources,
         });
+        this.similarityVerificationClient.trigger(
+          this.sourcifyChain.chainId,
+          address,
+          creatorTxHash,
+        );
         return;
       }
 

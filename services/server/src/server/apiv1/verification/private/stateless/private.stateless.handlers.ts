@@ -1,19 +1,21 @@
-import { Response } from "express";
-import { LegacyVerifyRequest, extractFiles } from "../../verification.common";
-import {
+import type { Response } from "express";
+import type { LegacyVerifyRequest } from "../../verification.common";
+import { extractFiles } from "../../verification.common";
+import type {
   ISolidityCompiler,
   SolidityMetadataContract,
-  createMetadataContractsFromFiles,
-  Verification,
   SolidityJsonInput,
-  SolidityCompilation,
   AbstractCompilation,
   CompilationTarget,
   SourcifyChain,
   VyperJsonInput,
   IVyperCompiler,
-  VyperCompilation,
+} from "@ethereum-sourcify/lib-sourcify";
+import {
+  createMetadataContractsFromFiles,
+  Verification,
   splitFullyQualifiedName,
+  CompilationError,
 } from "@ethereum-sourcify/lib-sourcify";
 import {
   BadRequestError,
@@ -21,15 +23,16 @@ import {
   InternalServerError,
 } from "../../../../../common/errors";
 import { StatusCodes } from "http-status-codes";
-import { Services } from "../../../../services/services";
-import { ChainRepository } from "../../../../../sourcify-chain-repository";
+import type { Services } from "../../../../services/services";
+import type { ChainRepository } from "../../../../../sourcify-chain-repository";
 import logger from "../../../../../common/logger";
 import { getApiV1ResponseFromVerification } from "../../../controllers.common";
-import { SourcifyDatabaseService } from "../../../../services/storageServices/SourcifyDatabaseService";
+import type { SourcifyDatabaseService } from "../../../../services/storageServices/SourcifyDatabaseService";
 import SourcifyChainMock from "../../../../services/utils/SourcifyChainMock";
 import { getCreatorTx } from "../../../../services/utils/contract-creation-util";
-import { extractCompilationFromDatabase } from "../../../../services/utils/database-util";
-import { CustomReplaceMethod, REPLACE_METHODS } from "./customReplaceMethods";
+import type { CustomReplaceMethod } from "./customReplaceMethods";
+import { REPLACE_METHODS } from "./customReplaceMethods";
+import { createCompilationFromJsonInput } from "../../../../services/utils/compilation";
 
 export async function verifyDeprecated(
   req: LegacyVerifyRequest,
@@ -216,12 +219,12 @@ export async function replaceContract(
         solc,
         vyper,
       };
-      compilation = await extractCompilationFromDatabase(
-        sourcifyDatabaseService.database,
-        compilers,
-        address,
-        chainId,
-      );
+      compilation =
+        await sourcifyDatabaseService.getPreRunCompilationFromDatabase(
+          chainId,
+          address,
+          compilers,
+        );
     } else {
       // Create a SolidityCompilation object and compile it if forceCompilation is true
       if (
@@ -233,25 +236,25 @@ export async function replaceContract(
           "jsonInput, compilerVersion and compilationTarget are required when forceCompilation is true",
         );
       }
-      if (jsonInput?.language === "Solidity") {
-        compilation = new SolidityCompilation(
-          solc,
+      try {
+        compilation = createCompilationFromJsonInput(
+          { solc, vyper },
           compilerVersion,
-          jsonInput as SolidityJsonInput,
+          jsonInput,
           compilationTarget,
         );
-      } else if (jsonInput?.language === "Vyper") {
-        compilation = new VyperCompilation(
-          vyper,
-          compilerVersion,
-          jsonInput as VyperJsonInput,
-          compilationTarget,
-        );
-      } else {
-        throw new BadRequestError(
-          "Invalid language. Only Solidity and Vyper are supported",
-        );
+      } catch (err: any) {
+        if (
+          err instanceof CompilationError &&
+          err.code === "invalid_language"
+        ) {
+          throw new BadRequestError(
+            "Invalid language. Only Solidity and Vyper are supported",
+          );
+        }
+        throw err;
       }
+
       await compilation.compile();
     }
 

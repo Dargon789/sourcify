@@ -1,5 +1,22 @@
 
 
+## sourcify-4byte@1.1.6 - 2026-01-07
+
+- update dependencies
+
+## sourcify-4byte@1.1.5 - 2025-12-15
+
+- Update dependencies
+
+## sourcify-4byte@1.1.4 - 2025-11-19
+
+- update dependencies
+- Turn @typescript-eslint/consistent-type-imports rule on (#2496)
+
+## sourcify-4byte@1.1.3 - 2025-11-04
+
+- update dependencies
+
 ## sourcify-4byte@1.1.2 - 2025-10-30
 
 - Add canonical signature (#2471)

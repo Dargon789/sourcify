@@ -1,14 +1,18 @@
-import {
+import type {
   CompilationLanguage,
   VerificationExport,
   VyperSettings,
 } from "@ethereum-sourcify/lib-sourcify";
 import logger from "../../../common/logger";
-import { WStorageService } from "../StorageService";
+import type { StorageService, WStorageService } from "../StorageService";
 import { WStorageIdentifiers } from "./identifiers";
-import { Database } from "../utils/Database";
-import { SourcifyDatabaseService } from "./SourcifyDatabaseService";
-import { ExternalVerification } from "../utils/database-util";
+import type { Database } from "../utils/Database";
+import type { SourcifyDatabaseService } from "./SourcifyDatabaseService";
+import type { ExternalVerification, Tables } from "../utils/database-util";
+import type {
+  ApiExternalVerification,
+  ApiExternalVerifications,
+} from "../../types";
 
 export type EtherscanVerifyApiIdentifiers =
   | WStorageIdentifiers.EtherscanVerify
@@ -19,6 +23,7 @@ const DEFAULT_ETHERSCAN_CHAINLIST_ENDPOINT =
   "https://api.etherscan.io/v2/chainlist";
 const DEFAULT_BLOCKSCOUT_CHAINLIST_ENDPOINT =
   "https://chains.blockscout.com/api/chains";
+const VERIFIER_ALREADY_VERIFIED = "VERIFIER_ALREADY_VERIFIED";
 const ROUTESCAN_CHAINLIST_ENDPOINTS = [
   {
     workspace: "mainnet",
@@ -32,6 +37,9 @@ const ROUTESCAN_CHAINLIST_ENDPOINTS = [
 const ROUTESCAN_API_URL_TEMPLATE =
   "https://api.routescan.io/v2/network/${WORKSPACE}/evm/${CHAIN_ID}/etherscan/api";
 
+const ROUTESCAN_EXPLORER_URL_TEMPLATE =
+  "https://routescan.io/address/${ADDRESS}";
+
 type ChainApiUrls = Record<string, string>;
 
 interface EtherscanChainApiResult {
@@ -39,10 +47,16 @@ interface EtherscanChainApiResult {
     chainid?: string;
     apiurl?: string;
     status?: number;
+    blockexplorer?: string;
   }[];
 }
 
-const fetchEtherscanChainApiUrls = async (): Promise<ChainApiUrls> => {
+interface VerifierInformation {
+  apiUrls: ChainApiUrls;
+  explorerUrls: ChainApiUrls;
+}
+
+const fetchEtherscanInformation = async (): Promise<VerifierInformation> => {
   const targetEndpoint = DEFAULT_ETHERSCAN_CHAINLIST_ENDPOINT;
   let response: Response;
 
@@ -77,15 +91,28 @@ const fetchEtherscanChainApiUrls = async (): Promise<ChainApiUrls> => {
   }
 
   const apiUrls: Record<string, string> = {};
+  const explorerUrls: Record<string, string> = {};
 
   for (const entry of payload.result) {
     if (!entry || entry.status !== 1) continue;
-    if (!entry.chainid || !entry.apiurl) continue;
+    if (!entry.chainid || !entry.apiurl || !entry.blockexplorer) continue;
 
     try {
       const parsedUrl = new URL(entry.apiurl);
       parsedUrl.hash = "";
       apiUrls[entry.chainid] = parsedUrl.toString();
+    } catch (error) {
+      logger.warn("Skipping invalid Etherscan API URL", {
+        entry,
+        error,
+      });
+    }
+
+    try {
+      const parsedUrl = new URL(entry.blockexplorer);
+      parsedUrl.hash = "";
+      explorerUrls[entry.chainid] =
+        `${parsedUrl.toString()}/address/\${ADDRESS}`;
     } catch (error) {
       logger.warn("Skipping invalid Etherscan API URL", {
         entry,
@@ -100,7 +127,10 @@ const fetchEtherscanChainApiUrls = async (): Promise<ChainApiUrls> => {
     );
   }
 
-  return apiUrls;
+  return {
+    apiUrls,
+    explorerUrls,
+  };
 };
 
 interface BlockscoutChainApiResult {
@@ -109,7 +139,7 @@ interface BlockscoutChainApiResult {
   };
 }
 
-const fetchBlockscoutChainApiUrls = async (): Promise<ChainApiUrls> => {
+const fetchBlockscoutInformation = async (): Promise<VerifierInformation> => {
   let response: Response;
   const endpoint = DEFAULT_BLOCKSCOUT_CHAINLIST_ENDPOINT;
   try {
@@ -134,6 +164,7 @@ const fetchBlockscoutChainApiUrls = async (): Promise<ChainApiUrls> => {
   }
   const payload = (await response.json()) as BlockscoutChainApiResult;
   const apiUrls: Record<string, string> = {};
+  const explorerUrls: Record<string, string> = {};
   for (const [chainId, chainData] of Object.entries(payload)) {
     const explorers = chainData?.explorers;
     if (!Array.isArray(explorers)) continue;
@@ -145,6 +176,7 @@ const fetchBlockscoutChainApiUrls = async (): Promise<ChainApiUrls> => {
       explorerUrl.search = "";
       explorerUrl.hash = "";
       apiUrls[chainId] = explorerUrl.toString();
+      explorerUrls[chainId] = `${blockscoutExplorer.url}/address/\${ADDRESS}`;
     } catch (error) {
       logger.warn("Skipping invalid Blockscout explorer URL", {
         chainId,
@@ -158,7 +190,10 @@ const fetchBlockscoutChainApiUrls = async (): Promise<ChainApiUrls> => {
       "Blockscout chain list did not contain any usable endpoints",
     );
   }
-  return apiUrls;
+  return {
+    apiUrls,
+    explorerUrls,
+  };
 };
 
 interface RoutescanChainApiResult {
@@ -168,8 +203,9 @@ interface RoutescanChainApiResult {
   }[];
 }
 
-const fetchRoutescanChainApiUrls = async (): Promise<ChainApiUrls> => {
+const fetchRoutescanInformation = async (): Promise<VerifierInformation> => {
   const apiUrls: ChainApiUrls = {};
+  const explorerUrls: Record<string, string> = {};
 
   for (const { workspace, endpoint } of ROUTESCAN_CHAINLIST_ENDPOINTS) {
     let response: Response;
@@ -237,6 +273,8 @@ const fetchRoutescanChainApiUrls = async (): Promise<ChainApiUrls> => {
         url.hash = "";
 
         apiUrls[String(evmChainId)] = url.toString();
+        explorerUrls[String(evmChainId)] =
+          `${ROUTESCAN_EXPLORER_URL_TEMPLATE}?chainid=${String(chainId)}`;
       } catch (error) {
         logger.warn("Skipping invalid Routescan API URL", {
           workspace,
@@ -253,7 +291,10 @@ const fetchRoutescanChainApiUrls = async (): Promise<ChainApiUrls> => {
     );
   }
 
-  return apiUrls;
+  return {
+    apiUrls,
+    explorerUrls,
+  };
 };
 
 interface EtherscanRpcResponse {
@@ -262,9 +303,105 @@ interface EtherscanRpcResponse {
   result: string;
 }
 
+export const buildJobExternalVerificationsObject = (
+  storageService: StorageService,
+  externalVerification: Tables.VerificationJob["external_verification"],
+  chainId: string,
+  address: string,
+  verificationJobId: string,
+): ApiExternalVerifications => {
+  if (!externalVerification) {
+    return {};
+  }
+  return Object.keys(externalVerification).reduce((verifiersData, verifier) => {
+    const verifierIdentifier = verifier as EtherscanVerifyApiIdentifiers;
+    const verifierService = storageService.wServices[verifierIdentifier] as
+      | EtherscanVerifyApiService
+      | undefined;
+    const verifierData = externalVerification[verifierIdentifier];
+    if (!verifierData) {
+      return verifiersData;
+    }
+
+    let statusUrl;
+    let contractApiUrl;
+    if (
+      verifierData.verificationId &&
+      // We need to handle the special case for a blockscout already verified contract
+      verifierData.verificationId !== VERIFIER_ALREADY_VERIFIED
+    ) {
+      try {
+        const statusApiBaseUrl = verifierService?.getApiUrl(
+          "checkverifystatus",
+          parseInt(chainId),
+        );
+        if (statusApiBaseUrl) {
+          statusUrl = `${statusApiBaseUrl}&guid=${encodeURIComponent(verifierData.verificationId)}`;
+        }
+
+        const contractApiBaseUrl = verifierService?.getApiUrl(
+          "getabi",
+          parseInt(chainId),
+        );
+        if (contractApiBaseUrl) {
+          contractApiUrl = `${contractApiBaseUrl}&address=${address}`;
+        }
+      } catch (error) {
+        // Cannot generate url
+      }
+    }
+
+    let explorerUrl;
+    if (verifierData.verificationId) {
+      try {
+        const apiBaseUrl = verifierService?.getExplorerUrl(parseInt(chainId));
+        if (apiBaseUrl) {
+          explorerUrl = apiBaseUrl.replace(
+            "${ADDRESS}",
+            encodeURIComponent(address),
+          );
+        }
+      } catch (error) {
+        // Cannot generate url
+      }
+    }
+
+    const externalVerifications: ApiExternalVerification = {
+      verificationId: verifierData.verificationId,
+      error: verifierData.error,
+      statusUrl,
+      explorerUrl,
+      contractApiUrl,
+    };
+
+    switch (verifier) {
+      case WStorageIdentifiers.EtherscanVerify:
+        verifiersData.etherscan = externalVerifications;
+        break;
+      case WStorageIdentifiers.BlockscoutVerify:
+        verifiersData.blockscout = externalVerifications;
+        break;
+      case WStorageIdentifiers.RoutescanVerify:
+        verifiersData.routescan = externalVerifications;
+        break;
+      default:
+        logger.warn("Unknown external verifier found", {
+          verifier,
+          verificationJobId,
+        });
+        break;
+    }
+    return verifiersData;
+  }, {} as ApiExternalVerifications);
+};
+
 export interface EtherscanVerifyApiServiceOptions {
-  /** Mapping of chainId to the explorer API base URL */
-  chainApiUrls?: ChainApiUrls;
+  chainInformation?: {
+    /** Mapping of chainId to the explorer API base URL */
+    apiUrls?: ChainApiUrls;
+    /** Mapping of chainId to the explorer URL */
+    explorerUrls?: ChainApiUrls;
+  };
   /** Optional mapping of chainId to API keys */
   apiKeys?: Record<string, string>;
   /** Optional fallback API key when chain-specific key is missing */
@@ -276,6 +413,7 @@ export class EtherscanVerifyApiService implements WStorageService {
   private database: Database;
 
   private readonly options: Required<EtherscanVerifyApiServiceOptions>;
+  private readonly abortController: AbortController;
 
   constructor(
     identifier: EtherscanVerifyApiIdentifiers,
@@ -285,29 +423,46 @@ export class EtherscanVerifyApiService implements WStorageService {
     this.IDENTIFIER = identifier;
     this.database = sourcifyDatabaseService.database;
     this.options = {
-      chainApiUrls: options?.chainApiUrls || {},
+      chainInformation: options?.chainInformation || {},
       apiKeys: options?.apiKeys || {},
       defaultApiKey: options?.defaultApiKey || "",
     };
+    this.abortController = new AbortController();
   }
 
   async init(): Promise<boolean> {
-    if (Object.keys(this.options.chainApiUrls).length === 0) {
+    if (
+      !this.options.chainInformation ||
+      Object.keys(this.options.chainInformation).length === 0
+    ) {
       switch (this.IDENTIFIER) {
-        case WStorageIdentifiers.EtherscanVerify:
-          this.options.chainApiUrls = await fetchEtherscanChainApiUrls();
+        case WStorageIdentifiers.EtherscanVerify: {
+          const { apiUrls, explorerUrls } = await fetchEtherscanInformation();
+          this.options.chainInformation.apiUrls = apiUrls;
+          this.options.chainInformation.explorerUrls = explorerUrls;
           break;
-        case WStorageIdentifiers.BlockscoutVerify:
-          this.options.chainApiUrls = await fetchBlockscoutChainApiUrls();
+        }
+        case WStorageIdentifiers.BlockscoutVerify: {
+          const { apiUrls, explorerUrls } = await fetchBlockscoutInformation();
+          this.options.chainInformation.apiUrls = apiUrls;
+          this.options.chainInformation.explorerUrls = explorerUrls;
           break;
-        case WStorageIdentifiers.RoutescanVerify:
-          this.options.chainApiUrls = await fetchRoutescanChainApiUrls();
+        }
+        case WStorageIdentifiers.RoutescanVerify: {
+          const { apiUrls, explorerUrls } = await fetchRoutescanInformation();
+          this.options.chainInformation.apiUrls = apiUrls;
+          this.options.chainInformation.explorerUrls = explorerUrls;
           break;
+        }
         default:
           throw new Error(`Unsupported verifier: ${this.IDENTIFIER}`);
       }
     }
     return true;
+  }
+
+  async close(): Promise<void> {
+    this.abortController.abort();
   }
 
   async storeVerification(
@@ -363,31 +518,25 @@ export class EtherscanVerifyApiService implements WStorageService {
       return;
     }
 
-    let response: EtherscanRpcResponse;
-    try {
-      response = await this.submitVerification(verification, apiBaseUrl);
-    } catch (error: any) {
-      // Store the external verification result if we have job data
-      if (jobData) {
-        this.storeExternalVerificationResult(jobData, {
-          error: error.message,
-        });
-      }
-      logger.error("Failed to submit verification to explorer", {
-        ...submissionContext,
-        error,
-        apiBaseUrl,
+    const response = await this.sendVerificationWithRetry(
+      (...args) => this.submitVerification(...args),
+      verification,
+      apiBaseUrl,
+      submissionContext,
+      jobData,
+    );
+
+    // Handle the "already verified" case for Blockscout and Etherscan by storing
+    // { verificationId: "VERIFIER_ALREADY_VERIFIED" }
+    if (
+      (this.IDENTIFIER === WStorageIdentifiers.BlockscoutVerify &&
+        response.result === "Smart-contract already verified.") ||
+      (this.IDENTIFIER === WStorageIdentifiers.EtherscanVerify &&
+        response.result === "Contract source code already verified")
+    ) {
+      await this.storeExternalVerificationResult(jobData, {
+        verificationId: VERIFIER_ALREADY_VERIFIED,
       });
-      throw error;
-    }
-
-    logger.info("Submitted verification to explorer", {
-      ...submissionContext,
-      receiptId: response.result,
-    });
-
-    // If we don't have job data, we cannot store the result
-    if (!jobData?.verificationId) {
       return;
     }
 
@@ -395,28 +544,39 @@ export class EtherscanVerifyApiService implements WStorageService {
     if (response.status !== "1" || response.message !== "OK") {
       logger.warn("Explorer rejected verification submission", {
         ...submissionContext,
-        verificationJobId: jobData.verificationId,
+        verificationJobId: jobData?.verificationId,
         error: response.result,
       });
-      this.storeExternalVerificationResult(jobData, {
+      await this.storeExternalVerificationResult(jobData, {
         error: response.result,
       });
       return;
     }
 
+    logger.info("Submitted verification successfully to explorer", {
+      ...submissionContext,
+      receiptId: response.result,
+      verificationJobId: jobData?.verificationId,
+    });
+
     // Record the result of the successful submission
-    this.storeExternalVerificationResult(jobData, {
+    await this.storeExternalVerificationResult(jobData, {
       verificationId: response.result,
     });
   }
 
   private async storeExternalVerificationResult(
-    jobData: {
-      verificationId: string;
-      finishTime: Date;
-    },
+    jobData:
+      | {
+          verificationId: string;
+          finishTime: Date;
+        }
+      | undefined,
     response: ExternalVerification,
   ): Promise<void> {
+    if (!jobData?.verificationId) {
+      return;
+    }
     // Record the result of the successful submission
     try {
       await this.database.upsertExternalVerification(
@@ -435,27 +595,155 @@ export class EtherscanVerifyApiService implements WStorageService {
   private async submitVerification(
     verification: VerificationExport,
     apiBaseUrl: string,
+    submissionContext: {
+      identifier: string;
+      chainId: number;
+      address: string;
+    },
+    jobData?: {
+      verificationId: string;
+      finishTime: Date;
+    },
   ): Promise<EtherscanRpcResponse> {
-    const url = this.buildApiUrl(
+    try {
+      const url = this.buildApiUrl(
+        apiBaseUrl,
+        "verifysourcecode",
+        verification.chainId,
+      );
+      const body = this.buildVerificationPayload(verification);
+
+      const response = await fetch(url, {
+        method: "POST",
+        body,
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(
+          `Explorer verification request failed (${response.status}): ${responseText}`,
+        );
+      }
+
+      return (await response.json()) as EtherscanRpcResponse;
+    } catch (error: any) {
+      await this.storeExternalVerificationResult(jobData, {
+        error: error.message,
+      });
+      logger.error("Failed to submit verification to explorer", {
+        ...submissionContext,
+        apiBaseUrl,
+        error,
+      });
+      throw error;
+    }
+  }
+
+  private async sendVerificationWithRetry(
+    submissionFunction: typeof this.submitVerification,
+    verification: VerificationExport,
+    apiBaseUrl: string,
+    submissionContext: {
+      identifier: string;
+      chainId: number;
+      address: string;
+    },
+    jobData?: {
+      verificationId: string;
+      finishTime: Date;
+    },
+  ): Promise<EtherscanRpcResponse> {
+    const MAX_RETRIES = 6;
+    const RETRY_DELAY_MS = 5000;
+
+    let response = await submissionFunction(
+      verification,
       apiBaseUrl,
-      "verifysourcecode",
-      verification.chainId,
+      submissionContext,
+      jobData,
     );
-    const body = this.buildVerificationPayload(verification);
 
-    const response = await fetch(url, {
-      method: "POST",
-      body,
-    });
-
-    if (!response.ok) {
-      const responseText = await response.text();
-      throw new Error(
-        `Explorer verification request failed (${response.status}): ${responseText}`,
+    // Case in which Etherscan explorer hasn't indexed the contract yet
+    let retries = 0;
+    while (
+      (response.message.startsWith("Unable to locate ContractCode at") ||
+        response.message.startsWith("Address is not a smart-contract") ||
+        response.message.startsWith("The address is not a smart contract")) &&
+      retries < MAX_RETRIES
+    ) {
+      retries += 1;
+      logger.info(
+        "Explorer has not indexed the contract yet; retrying verification submission",
+        {
+          ...submissionContext,
+          attempt: retries,
+          MAX_RETRIES,
+        },
+      );
+      try {
+        await this.cancellableDelay(RETRY_DELAY_MS);
+      } catch (error) {
+        // Delay was cancelled due to service shutdown
+        logger.info("Verification retry cancelled due to service shutdown", {
+          ...submissionContext,
+        });
+        throw error;
+      }
+      response = await submissionFunction(
+        verification,
+        apiBaseUrl,
+        submissionContext,
+        jobData,
       );
     }
 
-    return (await response.json()) as EtherscanRpcResponse;
+    return response;
+  }
+
+  private async submitBlockscoutVyperVerification(
+    verification: VerificationExport,
+    apiBaseUrl: string,
+    submissionContext: {
+      identifier: string;
+      chainId: number;
+      address: string;
+    },
+    jobData?: {
+      verificationId: string;
+      finishTime: Date;
+    },
+  ): Promise<EtherscanRpcResponse> {
+    try {
+      const url = this.buildBlockscoutVyperUrl(
+        apiBaseUrl,
+        verification.address,
+      );
+      const body = this.buildBlockscoutVyperPayload(verification);
+
+      const response = await fetch(url, {
+        method: "POST",
+        body,
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(
+          `Blockscout Vyper verification request failed (${response.status}): ${responseText}`,
+        );
+      }
+
+      return (await response.json()) as EtherscanRpcResponse;
+    } catch (error: any) {
+      await this.storeExternalVerificationResult(jobData, {
+        error: error.message,
+      });
+      logger.error("Blockscout Vyper verification request failed", {
+        ...submissionContext,
+        apiBaseUrl,
+        error,
+      });
+      throw error;
+    }
   }
 
   private async handleBlockscoutVyperVerification(
@@ -471,50 +759,28 @@ export class EtherscanVerifyApiService implements WStorageService {
       finishTime: Date;
     },
   ): Promise<void> {
-    const url = this.buildBlockscoutVyperUrl(apiBaseUrl, verification.address);
-    const body = this.buildBlockscoutVyperPayload(verification);
+    const response = await this.sendVerificationWithRetry(
+      (...args) => this.submitBlockscoutVyperVerification(...args),
+      verification,
+      apiBaseUrl,
+      submissionContext,
+      jobData,
+    );
 
-    const response = await fetch(url, {
-      method: "POST",
-      body,
-    });
-
-    // This case handles the Bad Requests cases or server errors
-    if (!response.ok) {
-      const responseText = await response.text();
-      if (jobData) {
-        this.storeExternalVerificationResult(jobData, {
-          error: responseText,
-        });
-      }
-      logger.warn("Blockscout Vyper verification request failed", {
-        status: response.status,
-        responseText,
-        apiBaseUrl,
+    // Blockscout does not return a verification ID,
+    // so we use a fixed string to indicate a successful submission
+    if (response.message === "Smart-contract verification started") {
+      await this.storeExternalVerificationResult(jobData, {
+        verificationId: "BLOCKSCOUT_VYPER_SUBMITTED",
       });
-      throw new Error(
-        `Blockscout Vyper verification request failed (${response.status}): ${responseText}`,
-      );
-    }
-    const res = (await response.json()) as {
-      message: string;
-    };
-    if (jobData) {
-      // Blockscout does not return a verification ID,
-      // so we use a fixed string to indicate a successful submission
-      if (res.message === "Smart-contract verification started") {
-        this.storeExternalVerificationResult(jobData, {
-          verificationId: "BLOCKSCOUT_VYPER_SUBMITTED",
-        });
-      } else {
-        this.storeExternalVerificationResult(jobData, {
-          error: res.message,
-        });
-      }
+    } else {
+      await this.storeExternalVerificationResult(jobData, {
+        error: response.message,
+      });
     }
     logger.info("Submitted verification to explorer", {
       ...submissionContext,
-      receiptId: res.message,
+      receiptId: response.message,
     });
   }
 
@@ -625,10 +891,24 @@ export class EtherscanVerifyApiService implements WStorageService {
     return constructorArgs.replace(/^0x/i, "");
   }
 
+  public getExplorerUrl(chainId: number): string | undefined {
+    const key = String(chainId);
+    return this.options.chainInformation?.explorerUrls?.[key];
+  }
+
+  public getApiUrl(action: string, chainId: number): string | undefined {
+    const apiBaseUrl = this.getApiBaseUrl(chainId);
+    if (!apiBaseUrl) {
+      return undefined;
+    }
+    return this.buildApiUrl(apiBaseUrl, action, chainId, false);
+  }
+
   private buildApiUrl(
     apiBaseUrl: string,
     action: string,
     chainId: number,
+    includeApiKey = true,
   ): string {
     const url = new URL(apiBaseUrl);
 
@@ -636,9 +916,11 @@ export class EtherscanVerifyApiService implements WStorageService {
     url.searchParams.set("action", action);
     url.searchParams.set("chainid", String(chainId));
 
-    const apiKey = this.getApiKey(chainId);
-    if (apiKey) {
-      url.searchParams.set("apikey", apiKey);
+    if (includeApiKey) {
+      const apiKey = this.getApiKey(chainId);
+      if (apiKey) {
+        url.searchParams.set("apikey", apiKey);
+      }
     }
 
     return url.toString();
@@ -646,7 +928,7 @@ export class EtherscanVerifyApiService implements WStorageService {
 
   private getApiBaseUrl(chainId: number): string | undefined {
     const key = String(chainId);
-    return this.options.chainApiUrls[key];
+    return this.options.chainInformation?.apiUrls?.[key];
   }
 
   private getApiKey(chainId: number): string | undefined {
@@ -687,5 +969,18 @@ export class EtherscanVerifyApiService implements WStorageService {
     }
 
     return false;
+  }
+
+  private async cancellableDelay(ms: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(resolve, ms);
+      const onAbort = () => {
+        clearTimeout(timeout);
+        reject(new Error("Delay cancelled"));
+      };
+      this.abortController.signal.addEventListener("abort", onAbort, {
+        once: true,
+      });
+    });
   }
 }

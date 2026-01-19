@@ -13,6 +13,9 @@ const defaultConfig = {
     maxRetries: 3,
     retryDelay: 30000,
   },
+  similarityVerification: {
+    requestDelay: 15000,
+  },
   defaultChainConfig: {
     startBlock: undefined,
     blockInterval: 10000,
@@ -21,6 +24,14 @@ const defaultConfig = {
     blockIntervalLowerLimit: 25,
     bytecodeInterval: 5000,
     bytecodeNumberOfTries: 5,
+    traceInterval: 15000,
+    traceNumberOfTries: 5,
+    traceDelay: 0,
+  },
+  chainConfigs: {
+    100: {
+      traceDelay: 300000,
+    },
   },
 };
 

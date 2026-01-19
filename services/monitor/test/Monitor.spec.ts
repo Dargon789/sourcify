@@ -1,8 +1,10 @@
 import { expect } from "chai";
-import sinon, { SinonSandbox } from "sinon";
+import type { SinonSandbox } from "sinon";
+import sinon from "sinon";
 import Monitor, { authenticateRpcs } from "../src/Monitor";
 import logger from "../src/logger";
-import { FetchRequest, JsonRpcProvider, JsonRpcSigner, Network } from "ethers";
+import type { JsonRpcSigner } from "ethers";
+import { JsonRpcProvider, Network } from "ethers";
 import {
   deployFromAbiAndBytecode,
   nockInterceptorForVerification,
@@ -12,11 +14,11 @@ import {
   startHardhatNetwork,
   stopHardhatNetwork,
 } from "./hardhat-network-helper";
-import { ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
 import storageContractArtifact from "./sources/Storage/1_Storage.json";
 import nock from "nock";
-import { RpcObject } from "../src/types";
-import { FetchRequestRPC } from "@ethereum-sourcify/lib-sourcify";
+import type { RpcObject } from "../src/types";
+import type { FetchRequestRPC } from "@ethereum-sourcify/lib-sourcify";
 
 const HARDHAT_PORT = 8546;
 // Configured in hardhat.config.js
@@ -24,6 +26,7 @@ const HARDHAT_BLOCK_TIME_IN_SEC = 3;
 const MOCK_SOURCIFY_SERVER = "http://mocksourcifyserver.dev/server/";
 const MOCK_SOURCIFY_SERVER_RETURNING_ERRORS =
   "http://mocksourcifyserver-returning-errors.dev/server/";
+const MOCK_SIMILARITY_SERVER = "http://mocksimilarity.dev/server/";
 const localChain = {
   chainId: 1337,
   rpc: [`http://localhost:${HARDHAT_PORT}`],
@@ -77,7 +80,7 @@ describe("Monitor", function () {
     it("should return string RPC unchanged", () => {
       const rpc = "https://example.com/rpc";
       const result = authenticateRpcs({ chainId: 1, rpc: [rpc], name: "Test" });
-      expect(result).to.deep.equal([rpc]);
+      expect(result).to.deep.equal([{ rpc }]);
     });
 
     it("should replace API key in URL for ApiKey type", () => {
@@ -88,7 +91,24 @@ describe("Monitor", function () {
         apiKeyEnvName: "TEST_API_KEY",
       };
       const result = authenticateRpcs({ chainId: 1, rpc: [rpc], name: "Test" });
-      expect(result).to.deep.equal(["https://example.com/rpc/testkey123"]);
+      expect(result).to.deep.equal([
+        { rpc: "https://example.com/rpc/testkey123" },
+      ]);
+    });
+
+    it("should replace subdomain in URL for ApiKey type", () => {
+      process.env.TEST_API_KEY = "testkey123";
+      process.env.TEST_SUBDOMAIN = "test-subdomain";
+      const rpc: RpcObject = {
+        type: "ApiKey",
+        url: "https://{SUBDOMAIN}.example.com/rpc/{API_KEY}",
+        apiKeyEnvName: "TEST_API_KEY",
+        subDomainEnvName: "TEST_SUBDOMAIN",
+      };
+      const result = authenticateRpcs({ chainId: 1, rpc: [rpc], name: "Test" });
+      expect(result).to.deep.equal([
+        { rpc: "https://test-subdomain.example.com/rpc/testkey123" },
+      ]);
     });
 
     it("should throw error if API key is not found in environment variables", () => {
@@ -112,7 +132,7 @@ describe("Monitor", function () {
       const rpc = ["https://rpc.ethpandaops.io/test"];
       const result = authenticateRpcs({ chainId: 1, rpc: rpc, name: "Test" });
 
-      const fetchRequest = result[0] as FetchRequestRPC;
+      const fetchRequest = result[0].rpc as FetchRequestRPC;
       expect(fetchRequest.url).to.equal("https://rpc.ethpandaops.io/test");
       expect(fetchRequest.headers).to.be.an("array");
       expect(fetchRequest.headers).to.have.lengthOf(2);
@@ -150,6 +170,8 @@ describe("Monitor", function () {
   });
 
   it("should throw an error if there are chainConfigs for chains not being monitored", () => {
+    const nodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
     expect(
       () =>
         new Monitor([localChain], {
@@ -160,6 +182,7 @@ describe("Monitor", function () {
     ).to.throw(
       "Chain configs found for chains that are not being monitored: 2",
     );
+    process.env.NODE_ENV = nodeEnv;
   });
 
   it("should successfully catch a deployed contract, assemble, and send to Sourcify", async () => {
@@ -236,6 +259,56 @@ describe("Monitor", function () {
         });
       monitor.start();
     });
+  });
+
+  it("should trigger similarity verification when contract assembly fails", async () => {
+    monitor = new Monitor([localChain], {
+      sourcifyServerURLs: [MOCK_SIMILARITY_SERVER],
+      decentralizedStorages: {
+        ipfs: {
+          enabled: false,
+          gateways: [],
+        },
+      },
+      chainConfigs: {
+        [localChain.chainId]: {
+          startBlock: 0,
+          blockInterval: HARDHAT_BLOCK_TIME_IN_SEC * 1000,
+        },
+      },
+      similarityVerification: {
+        requestDelay: 2000, // Override to 2 seconds for faster tests
+      },
+    });
+
+    const contractAddress = await deployFromAbiAndBytecode(
+      signer,
+      storageContractArtifact.abi,
+      storageContractArtifact.bytecode,
+      [],
+    );
+
+    const similarityScope = nock("http://mocksimilarity.dev")
+      .post(
+        `/server/v2/verify/similarity/${localChain.chainId}/${contractAddress}`,
+        (body) => {
+          expect(body).to.have.property("creationTransactionHash");
+          return true;
+        },
+      )
+      .reply(200, { status: "ok" });
+
+    await monitor.start();
+
+    await new Promise<void>((resolve, reject) => {
+      similarityScope.on("replied", () => resolve());
+      setTimeout(
+        () => reject(new Error("Similarity verification not called")),
+        10000,
+      );
+    });
+
+    expect(similarityScope.isDone()).to.be.true;
   });
   // Add more test cases as needed
 });

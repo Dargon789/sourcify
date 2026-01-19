@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## sourcify-server@3.9.0 - 2026-01-07
+
+- Add support for Yul compilation and verification (#2521)
+- Add YUL OpenApi example (#2562)
+- Update OpenAPI documentation and private verification endpoints (#2549)
+- Fix verified contracts unique constraint error (#2552)
+- Fallback to chains.json rpcs (#2573)
+- Add ethpandaops archive node rpc (#2574)
+- Add support for Sei Testnet (chain ID 1328), edit contract for Sei Mainnet (Chain Id 1329) (#2550)
+- Add Sei Network specific Etherscan API key variable (#2547)
+- Disable chains which fail CI tests (#2557)
+
+
+## sourcify-server@3.8.1 - 2025-12-15
+
+- Support new "already verified" message from Etherscan (#2520)
+- Change JOIN to LEFT JOIN for compiled_contracts_signatures in query (#2526)
+- Fix v2 etherscan error handling (#2523)
+- Update PulseChain's fetchContractCreationTxUsing blockscout API link (#2528)
+- Enhance PulseChain Mainnet configuration (#2536)
+- Add await to storeExternalVerificationResult calls (#2534)
+- Add contractApiUrl to externalVerifcations returned properties (#2535)
+- Update dependencies
+- Fix prettier
+- Add chains:
+    - 1329 Sei network
+    - 42429 Tempo testnet
+
+
+## sourcify-server@3.8.0 - 2025-11-19
+
+- update dependencies
+- Turn @typescript-eslint/consistent-type-imports rule on (#2496)
+- Similarity search verification (#2481)
+- Enable prettier on yaml and js files inside server (#2499)
+- Add external verification links to verification job responses (#2504)
+- Add chains:
+  - 5042002 ARC-testnet
+  - 9700 OORT Testnet
+
+## sourcify-server@3.7.0 - 2025-11-04
+
+- Add /version endpoint to server (#2489)
+- Redirect to repo and verify UI also without path (#2480)
+- Add chain 296 Hedera Testnet (#2486)
+
 ## sourcify-server@3.6.1 - 2025-10-30
 
 - Disable Holesky Testnet because of deprecation (#2477)

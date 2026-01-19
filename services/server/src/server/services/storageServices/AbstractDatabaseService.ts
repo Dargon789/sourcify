@@ -1,8 +1,11 @@
-import { VerificationExport } from "@ethereum-sourcify/lib-sourcify";
+import type { VerificationExport } from "@ethereum-sourcify/lib-sourcify";
 import * as DatabaseUtil from "../utils/database-util";
-import { bytesFromString, Tables } from "../utils/database-util";
-import { Database, DatabaseOptions } from "../utils/Database";
-import { PoolClient, QueryResult } from "pg";
+import type { Tables } from "../utils/database-util";
+import { bytesFromString } from "../utils/database-util";
+import type { DatabaseOptions } from "../utils/Database";
+import { Database } from "../utils/Database";
+import type { PoolClient, QueryResult } from "pg";
+import { ConflictError } from "../../../common/errors/ConflictError";
 
 export default abstract class AbstractDatabaseService {
   public database: Database;
@@ -213,6 +216,9 @@ export default abstract class AbstractDatabaseService {
 
       return verifiedContractInsertResult.rows[0].id;
     } catch (e) {
+      if (e instanceof ConflictError) {
+        throw e;
+      }
       throw new Error(
         `cannot update verified_contract address=0x${databaseColumns.contractDeployment.address.toString("hex")} chainId=${databaseColumns.contractDeployment.chain_id}\n${e}`,
       );

@@ -1,5 +1,22 @@
 
 
+## @ethereum-sourcify/compilers@1.0.16 - 2026-01-07
+
+- update dependencies
+
+## @ethereum-sourcify/compilers@1.0.15 - 2025-12-15
+
+- Update dependencies
+
+## @ethereum-sourcify/compilers@1.0.14 - 2025-11-19
+
+- update dependencies
+- Turn @typescript-eslint/consistent-type-imports rule on (#2496)
+
+## @ethereum-sourcify/compilers@1.0.13 - 2025-11-04
+
+- update dependencies
+
 ## @ethereum-sourcify/compilers@1.0.12 - 2025-10-28
 
 - update dependencies

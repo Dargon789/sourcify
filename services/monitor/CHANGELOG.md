@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## sourcify-monitor@1.4.0 - 2026-01-07
+
+- Implement similarity verification in Monitor (#2539)
+
+
+## sourcify-monitor@1.3.26 - 2025-12-15
+
+- Update dependencies
+
+## sourcify-monitor@1.3.25 - 2025-11-19
+
+- update dependencies
+- Turn @typescript-eslint/consistent-type-imports rule on (#2496)
+
+## sourcify-monitor@1.3.24 - 2025-11-04
+
+- update dependencies
+
 ## sourcify-monitor@1.3.23 - 2025-10-30
 
 - Fix blocked rpcs after querying unpublished blocks (#2473)
