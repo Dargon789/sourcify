@@ -210,7 +210,41 @@ describe("initializeSourcifyChains", function () {
       expect(second).to.not.have.property("1");
     });
 
-    it("skips supported chains that have no usable RPCs", async function () {
+    it("throws when an APIKeyRPC env var is missing", async function () {
+      const apiKeyEnvName = `TEST_MISSING_API_KEY_${Date.now()}`;
+      // Belt-and-suspenders: ensure both the chain-specific var and the
+      // generic API_KEY fallback are unset for this test.
+      const originalApiKey = process.env.API_KEY;
+      delete process.env[apiKeyEnvName];
+      delete process.env.API_KEY;
+
+      try {
+        const chainsConfig = {
+          "1": {
+            sourcifyName: "Test Chain",
+            supported: true,
+            rpc: [
+              {
+                type: "APIKeyRPC",
+                url: "https://example.com/${API_KEY}",
+                apiKeyEnvName,
+              },
+            ],
+          },
+        };
+        sandbox
+          .stub(globalThis, "fetch")
+          .resolves(makeOkResponse(chainsConfig));
+
+        await expect(
+          initializeSourcifyChains({ remoteUrl: REMOTE_URL }),
+        ).to.be.rejectedWith(`API key not found for ${apiKeyEnvName}`);
+      } finally {
+        if (originalApiKey !== undefined) process.env.API_KEY = originalApiKey;
+      }
+    });
+
+    it("throws on supported chains that have no usable RPCs", async function () {
       const chainsWithNoRpc = {
         "99998": {
           sourcifyName: "No RPC Chain",
@@ -222,9 +256,11 @@ describe("initializeSourcifyChains", function () {
         .stub(globalThis, "fetch")
         .resolves(makeOkResponse(chainsWithNoRpc));
 
-      const result = await initializeSourcifyChains({ remoteUrl: REMOTE_URL });
-
-      expect(result).to.not.have.property("99998");
+      await expect(
+        initializeSourcifyChains({ remoteUrl: REMOTE_URL }),
+      ).to.be.rejectedWith(
+        "Supported chain 99998 (No RPC Chain) has no usable RPCs configured",
+      );
     });
 
     it("includes deprecated chains that have no RPCs (supported: false)", async function () {
