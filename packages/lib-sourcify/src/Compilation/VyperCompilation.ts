@@ -4,6 +4,7 @@ import {
   AuxdataStyle,
   decode,
   splitAuxdata,
+  type VyperDecodedObject,
 } from '@ethereum-sourcify/bytecode-utils';
 import semver, { gte, gt, lt } from 'semver';
 import type {
@@ -20,6 +21,10 @@ import type {
   IVyperCompiler,
 } from './CompilationTypes';
 import { CompilationError } from './CompilationTypes';
+import {
+  isValidImmutableLength,
+  returnLegacyVyperImmutableReferences,
+} from './legacyVyperImmutablesHelpers';
 
 export function returnFixedVyperVersion(compilerVersion: string): string {
   if (semver.valid(compilerVersion)) {
@@ -79,12 +84,20 @@ export function returnImmutableReferences(
   creationBytecode: string,
   runtimeBytecode: string,
   auxdataStyle: AuxdataStyle,
+  compilerOutput?: VyperOutput,
+  compilationTarget?: CompilationTarget,
 ): ImmutableReferences {
-  let immutableReferences = {};
+  let immutableReferences: ImmutableReferences = {};
   if (gte(compilerVersion, '0.3.10')) {
     try {
-      const { immutableSize } = decode(creationBytecode, auxdataStyle);
-      if (immutableSize) {
+      const { immutableSize } = decode(
+        creationBytecode,
+        auxdataStyle,
+      ) as VyperDecodedObject;
+      if (
+        immutableSize !== undefined &&
+        isValidImmutableLength(immutableSize)
+      ) {
         immutableReferences = {
           '0': [
             {
@@ -99,6 +112,12 @@ export function returnImmutableReferences(
         creationBytecode: creationBytecode,
       });
     }
+  } else if (gte(compilerVersion, '0.3.1') && compilationTarget !== undefined) {
+    immutableReferences = returnLegacyVyperImmutableReferences(
+      compilerOutput,
+      compilationTarget,
+      runtimeBytecode,
+    );
   }
   return immutableReferences;
 }
@@ -192,6 +211,8 @@ export class VyperCompilation extends AbstractCompilation {
       this.creationBytecode,
       this.runtimeBytecode,
       this.auxdataStyle,
+      this.compilerOutput,
+      this.compilationTarget,
     );
   }
 
