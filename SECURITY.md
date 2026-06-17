@@ -2,8 +2,7 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+The following table lists which versions currently receive security fixes. We provide security updates only for the latest patch releases in the 5.1.x and 4.0.x series. All 5.0.x releases and any version earlier than 4.0 are no longer supported for security updates.
 
 | Version | Supported          |
 | ------- | ------------------ |
